@@ -1,6 +1,7 @@
+putra@L MINGW64 ~/Downloads/Video/BRAIN
 $ python -m compileall -q .
 python -m unittest discover -s tests -v
-python -m brain_ai.cli
+python -m brain_ai.cli --memory brain_state.json
 test_empty_input_rejected (test_brain.CognitiveBrainTests.test_empty_input_rejected) ... ok
 test_exit_aliases_are_recognized (test_brain.CognitiveBrainTests.test_exit_aliases_are_recognized) ... ok
 test_feedback_changes_learning_parameters (test_brain.CognitiveBrainTests.test_feedback_changes_learning_parameters) ... ok
@@ -25,6 +26,10 @@ test_no_evidence_is_not_a_truth_claim (test_evidence_ledger.IntegratedEvidenceLe
 test_persistence_after_reopen (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_persistence_after_reopen) ... ok
 test_repetition_from_same_source_is_not_independent (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_repetition_from_same_source_is_not_independent) ... ok
 test_shared_independent_group_counts_as_one_declared_source_group (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_shared_independent_group_counts_as_one_declared_source_group) ... ok
+test_cli_banner_matches_release_version (test_learning_cycle.LearningCycleCLITests.test_cli_banner_matches_release_version) ... ok
+test_feedback_does_not_remove_conflict_from_reasoning (test_learning_cycle.LearningCycleCLITests.test_feedback_does_not_remove_conflict_from_reasoning) ... FAIL
+test_positive_feedback_updates_strategy_value_through_cli (test_learning_cycle.LearningCycleCLITests.test_positive_feedback_updates_strategy_value_through_cli) ... FAIL
+test_strategy_learning_persists_across_cli_restart (test_learning_cycle.LearningCycleCLITests.test_strategy_learning_persists_across_cli_restart) ... FAIL
 test_conflicting_assertions_are_exposed_but_not_resolved_automatically (test_v03.CognitiveBrainV03Tests.test_conflicting_assertions_are_exposed_but_not_resolved_automatically) ... ok
 test_event_trace_exposes_cognitive_cycle (test_v03.CognitiveBrainV03Tests.test_event_trace_exposes_cognitive_cycle) ... ok
 test_feedback_updates_persistent_action_value (test_v03.CognitiveBrainV03Tests.test_feedback_updates_persistent_action_value) ... ok
@@ -87,11 +92,17 @@ test_saved_state_schema_is_v7 (test_v09.CognitiveBrainV09EvidenceLedgerTests.tes
 test_standalone_ledger_loads_persisted_checks (test_v09.CognitiveBrainV09EvidenceLedgerTests.test_standalone_ledger_loads_persisted_checks) ... ok
 test_verifier_audits_provenance_ledger_without_claiming_truth (test_v09.CognitiveBrainV09EvidenceLedgerTests.test_verifier_audits_provenance_ledger_without_claiming_truth) ... ok
 
+======================================================================
+FAIL: test_feedback_does_not_remove_conflict_from_reasoning (test_learning_cycle.LearningCycleCLITests.test_feedback_does_not_remove_conflict_from_reasoning)
 ----------------------------------------------------------------------
-Ran 85 tests in 0.833s
-
-OK
-Human-Inspired Cognitive AI v0.9 — tanpa LLM
+Traceback (most recent call last):
+  File "C:\Users\putra\Downloads\Video\BRAIN\tests\test_learning_cycle.py", line 74, in test_feedback_does_not_remove_conflict_from_reasoning
+    output = self.run_cli(
+             ^^^^^^^^^^^^^
+  File "C:\Users\putra\Downloads\Video\BRAIN\tests\test_learning_cycle.py", line 34, in run_cli
+    self.assertEqual(result.returncode, 0, msg=f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+AssertionError: 1 != 0 : STDOUT:
+Human-Inspired Cognitive AI v0.9.2 — tanpa LLM
 Perintah: /goal TUJUAN | /status | /facts | /conflicts | /events | /memories | /verify ID_ATAU_KONSEP | /reason SUBJEK | RELASI | OBJEK | /strategies | /feedback POSITIVE|NEGATIVE|NEUTRAL | /quit
 Hipotesis: /hypothesis add GRUP | KLAIM | PREDIKSI | /hypotheses [GRUP] | /hypothesis compare GRUP | /hypothesis test ID
 Bukti hipotesis: /evidence H0001 support|against|neutral | DESKRIPSI | /evidence-list H0001
@@ -101,6 +112,996 @@ Catatan pemeriksaan: /claim-check C00001 | PEMERIKSA | METODE | supports|refutes
 Verifier: /verify H0001 untuk ledger hipotesis; /verify C00001 untuk ledger provenance; /verify kucing untuk graf semantik
 Strategi: /reason SUBJEK | RELASI | OBJEK; /strategies menampilkan preferensi dari umpan balik, bukan akurasi objektif
 Bahasa sederhana: kucing adalah mamalia; jika hujan maka jalan basah; hipotesis tentang cuaca?
+
+KAMU> Kesalahan pemrosesan: 'charmap' codec can't encode character '\u2192' in position 33: character maps to <undefined>
+
+KAMU> Kesalahan pemrosesan: 'charmap' codec can't encode character '\u2192' in position 34: character maps to <undefined>
+
+KAMU> Kesalahan pemrosesan: 'charmap' codec can't encode character '\u219b' in position 32: character maps to <undefined>
+
+KAMU> KESIMPULAN> conflicted
+Ada pernyataan yang bertentangan langsung di memori; kesimpulan ditahan.
+STRATEGI UTAMA DIAGNOSTIK> counterevidence_scan (preferensi umpan balik=0.00; bukan nilai kebenaran)
+STRATEGI:
+  - direct_lookup: match_found — Ditemukan 1 relasi langsung yang cocok.
+  - transitive_graph_search: path_found — Menemukan 1 jalur is_a satu arah.
+  - counterevidence_scan: counterevidence_found — Ada 1 sanggahan eksplisit di memori.
+  - independent_integrity_verifier: integrity_passed_unverified — Jalur dan pembukuan lolos pemeriksaan struktural; konflik semantik (jika ada) dilaporkan terpisah dan fakta tetap belum terverifikasi.
+
+STDERR:
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\putra\Downloads\Video\BRAIN\brain_ai\cli.py", line 388, in <module>
+    main()
+  File "C:\Users\putra\Downloads\Video\BRAIN\brain_ai\cli.py", line 301, in main
+    print("JALUR> " + " ; ".join(" \u2192 ".join(path) for path in result["paths_found"]))
+  File "C:\Users\putra\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 14: character maps to <undefined>
+
+
+======================================================================
+FAIL: test_positive_feedback_updates_strategy_value_through_cli (test_learning_cycle.LearningCycleCLITests.test_positive_feedback_updates_strategy_value_through_cli)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\putra\Downloads\Video\BRAIN\tests\test_learning_cycle.py", line 43, in test_positive_feedback_updates_strategy_value_through_cli
+    output = self.run_cli(
+             ^^^^^^^^^^^^^
+  File "C:\Users\putra\Downloads\Video\BRAIN\tests\test_learning_cycle.py", line 34, in run_cli
+    self.assertEqual(result.returncode, 0, msg=f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+AssertionError: 1 != 0 : STDOUT:
+Human-Inspired Cognitive AI v0.9.2 — tanpa LLM
+Perintah: /goal TUJUAN | /status | /facts | /conflicts | /events | /memories | /verify ID_ATAU_KONSEP | /reason SUBJEK | RELASI | OBJEK | /strategies | /feedback POSITIVE|NEGATIVE|NEUTRAL | /quit
+Hipotesis: /hypothesis add GRUP | KLAIM | PREDIKSI | /hypotheses [GRUP] | /hypothesis compare GRUP | /hypothesis test ID
+Bukti hipotesis: /evidence H0001 support|against|neutral | DESKRIPSI | /evidence-list H0001
+Klaim & provenance: /claim add SUBJEK | RELASI | OBJEK; /claim-evidence C00001 supports|refutes|neutral | SOURCE_ID | SOURCE_TYPE | DESKRIPSI
+Audit provenance: /claim-report C00001 | /claim-evidence-list C00001 | /claim-audit [C00001]
+Catatan pemeriksaan: /claim-check C00001 | PEMERIKSA | METODE | supports|refutes|mixed|inconclusive | ALASAN
+Verifier: /verify H0001 untuk ledger hipotesis; /verify C00001 untuk ledger provenance; /verify kucing untuk graf semantik
+Strategi: /reason SUBJEK | RELASI | OBJEK; /strategies menampilkan preferensi dari umpan balik, bukan akurasi objektif
+Bahasa sederhana: kucing adalah mamalia; jika hujan maka jalan basah; hipotesis tentang cuaca?
+
+KAMU> Tujuan aktif: uji learning end-to-end
+COGNITIVE_UPDATE> siklus=1; WORKSPACE> prefrontal_cortex:active_goal_update (0.67), prefrontal_cortex:active_goal (0.61)
+
+KAMU> Kesalahan pemrosesan: 'charmap' codec can't encode character '\u2192' in position 33: character maps to <undefined>
+
+KAMU> Kesalahan pemrosesan: 'charmap' codec can't encode character '\u2192' in position 34: character maps to <undefined>
+
+KAMU> KESIMPULAN> inference_path_unverified
+Jalur inferensi ditemukan; premis dan kesimpulannya tetap belum diverifikasi.
+STRATEGI UTAMA DIAGNOSTIK> transitive_graph_search (preferensi umpan balik=0.00; bukan nilai kebenaran)
+STRATEGI:
+  - direct_lookup: no_direct_match — Tidak ada relasi langsung yang cocok di memori.
+  - transitive_graph_search: path_found — Menemukan 1 jalur is_a satu arah.
+  - counterevidence_scan: no_stored_counterevidence_found — Tidak ditemukan sanggahan eksplisit pada ruang lingkup yang diperiksa; ini bukan bukti bahwa sanggahan tidak ada.
+  - independent_integrity_verifier: integrity_passed_unverified — Jalur dan pembukuan lolos pemeriksaan struktural; konflik semantik (jika ada) dilaporkan terpisah dan fakta tetap belum terverifikasi.
+
+STDERR:
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\putra\Downloads\Video\BRAIN\brain_ai\cli.py", line 388, in <module>
+    main()
+  File "C:\Users\putra\Downloads\Video\BRAIN\brain_ai\cli.py", line 301, in main
+    print("JALUR> " + " ; ".join(" \u2192 ".join(path) for path in result["paths_found"]))
+  File "C:\Users\putra\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 14: character maps to <undefined>
+
+
+======================================================================
+FAIL: test_strategy_learning_persists_across_cli_restart (test_learning_cycle.LearningCycleCLITests.test_strategy_learning_persists_across_cli_restart)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\putra\Downloads\Video\BRAIN\tests\test_learning_cycle.py", line 60, in test_strategy_learning_persists_across_cli_restart
+    self.run_cli(
+  File "C:\Users\putra\Downloads\Video\BRAIN\tests\test_learning_cycle.py", line 34, in run_cli
+    self.assertEqual(result.returncode, 0, msg=f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+AssertionError: 1 != 0 : STDOUT:
+Human-Inspired Cognitive AI v0.9.2 — tanpa LLM
+Perintah: /goal TUJUAN | /status | /facts | /conflicts | /events | /memories | /verify ID_ATAU_KONSEP | /reason SUBJEK | RELASI | OBJEK | /strategies | /feedback POSITIVE|NEGATIVE|NEUTRAL | /quit
+Hipotesis: /hypothesis add GRUP | KLAIM | PREDIKSI | /hypotheses [GRUP] | /hypothesis compare GRUP | /hypothesis test ID
+Bukti hipotesis: /evidence H0001 support|against|neutral | DESKRIPSI | /evidence-list H0001
+Klaim & provenance: /claim add SUBJEK | RELASI | OBJEK; /claim-evidence C00001 supports|refutes|neutral | SOURCE_ID | SOURCE_TYPE | DESKRIPSI
+Audit provenance: /claim-report C00001 | /claim-evidence-list C00001 | /claim-audit [C00001]
+Catatan pemeriksaan: /claim-check C00001 | PEMERIKSA | METODE | supports|refutes|mixed|inconclusive | ALASAN
+Verifier: /verify H0001 untuk ledger hipotesis; /verify C00001 untuk ledger provenance; /verify kucing untuk graf semantik
+Strategi: /reason SUBJEK | RELASI | OBJEK; /strategies menampilkan preferensi dari umpan balik, bukan akurasi objektif
+Bahasa sederhana: kucing adalah mamalia; jika hujan maka jalan basah; hipotesis tentang cuaca?
+
+KAMU> Kesalahan pemrosesan: 'charmap' codec can't encode character '\u2192' in position 33: character maps to <undefined>
+
+KAMU> Kesalahan pemrosesan: 'charmap' codec can't encode character '\u2192' in position 34: character maps to <undefined>
+
+KAMU> KESIMPULAN> inference_path_unverified
+Jalur inferensi ditemukan; premis dan kesimpulannya tetap belum diverifikasi.
+STRATEGI UTAMA DIAGNOSTIK> transitive_graph_search (preferensi umpan balik=0.00; bukan nilai kebenaran)
+STRATEGI:
+  - direct_lookup: no_direct_match — Tidak ada relasi langsung yang cocok di memori.
+  - transitive_graph_search: path_found — Menemukan 1 jalur is_a satu arah.
+  - counterevidence_scan: no_stored_counterevidence_found — Tidak ditemukan sanggahan eksplisit pada ruang lingkup yang diperiksa; ini bukan bukti bahwa sanggahan tidak ada.
+  - independent_integrity_verifier: integrity_passed_unverified — Jalur dan pembukuan lolos pemeriksaan struktural; konflik semantik (jika ada) dilaporkan terpisah dan fakta tetap belum terverifikasi.
+
+STDERR:
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\putra\Downloads\Video\BRAIN\brain_ai\cli.py", line 388, in <module>
+    main()
+  File "C:\Users\putra\Downloads\Video\BRAIN\brain_ai\cli.py", line 301, in main
+    print("JALUR> " + " ; ".join(" \u2192 ".join(path) for path in result["paths_found"]))
+  File "C:\Users\putra\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 14: character maps to <undefined>
+
+
+----------------------------------------------------------------------
+Ran 89 tests in 1.555s
+
+FAILED (failures=3)
+Human-Inspired Cognitive AI v0.9.2 — tanpa LLM
+Perintah: /goal TUJUAN | /status | /facts | /conflicts | /events | /memories | /verify ID_ATAU_KONSEP | /reason SUBJEK | RELASI | OBJEK | /strategies | /feedback POSITIVE|NEGATIVE|NEUTRAL | /quit
+Hipotesis: /hypothesis add GRUP | KLAIM | PREDIKSI | /hypotheses [GRUP] | /hypothesis compare GRUP | /hypothesis test ID
+Bukti hipotesis: /evidence H0001 support|against|neutral | DESKRIPSI | /evidence-list H0001
+Klaim & provenance: /claim add SUBJEK | RELASI | OBJEK; /claim-evidence C00001 supports|refutes|neutral | SOURCE_ID | SOURCE_TYPE | DESKRIPSI
+Audit provenance: /claim-report C00001 | /claim-evidence-list C00001 | /claim-audit [C00001]
+Catatan pemeriksaan: /claim-check C00001 | PEMERIKSA | METODE | supports|refutes|mixed|inconclusive | ALASAN
+Verifier: /verify H0001 untuk ledger hipotesis; /verify C00001 untuk ledger provenance; /verify kucing untuk graf semantik
+Strategi: /reason SUBJEK | RELASI | OBJEK; /strategies menampilkan preferensi dari umpan balik, bukan akurasi objektif
+Bahasa sederhana: kucing adalah mamalia; jika hujan maka jalan basah; hipotesis tentang cuaca?
+
+KAMU> quit
+Memori disimpan. Sampai jumpa.
+
+putra@L MINGW64 ~/Downloads/Video/BRAIN
+$ python -m brain_ai.cli --memory brain_state.json
+Human-Inspired Cognitive AI v0.9.2 — tanpa LLM
+Perintah: /goal TUJUAN | /status | /facts | /conflicts | /events | /memories | /verify ID_ATAU_KONSEP | /reason SUBJEK | RELASI | OBJEK | /strategies | /feedback POSITIVE|NEGATIVE|NEUTRAL | /quit
+Hipotesis: /hypothesis add GRUP | KLAIM | PREDIKSI | /hypotheses [GRUP] | /hypothesis compare GRUP | /hypothesis test ID
+Bukti hipotesis: /evidence H0001 support|against|neutral | DESKRIPSI | /evidence-list H0001
+Klaim & provenance: /claim add SUBJEK | RELASI | OBJEK; /claim-evidence C00001 supports|refutes|neutral | SOURCE_ID | SOURCE_TYPE | DESKRIPSI
+Audit provenance: /claim-report C00001 | /claim-evidence-list C00001 | /claim-audit [C00001]
+Catatan pemeriksaan: /claim-check C00001 | PEMERIKSA | METODE | supports|refutes|mixed|inconclusive | ALASAN
+Verifier: /verify H0001 untuk ledger hipotesis; /verify C00001 untuk ledger provenance; /verify kucing untuk graf semantik
+Strategi: /reason SUBJEK | RELASI | OBJEK; /strategies menampilkan preferensi dari umpan balik, bukan akurasi objektif
+Bahasa sederhana: kucing adalah mamalia; jika hujan maka jalan basah; hipotesis tentang cuaca?
+
+KAMU> /goal uji pembelajaran
+Tujuan aktif: uji pembelajaran
+COGNITIVE_UPDATE> siklus=1; WORKSPACE> prefrontal_cortex:active_goal_update (0.67), prefrontal_cortex:active_goal (0.61)
+
+KAMU> kucing adalah mamalia
+AI> Saya mencatat relasi: kucing → mamalia (baru). Ini adalah pernyataan pengguna, belum diverifikasi secara independen.
+WORKSPACE> perception:observed_input (0.73), prefrontal_cortex:active_goal (0.60), world_model:proposed_relation (0.60)
+ACTION> learn_relation (utility=0.95)
+
+KAMU> mamalia adalah hewan
+AI> Saya mencatat relasi: mamalia → hewan (baru). Ini adalah pernyataan pengguna, belum diverifikasi secara independen.
+WORKSPACE> perception:observed_input (0.66), prefrontal_cortex:active_goal (0.60), hippocampus:episodic_retrieval (0.60)
+ACTION> learn_relation (utility=0.85)
+
+KAMU> /reason kucing | is_a | hewan
+KESIMPULAN> inference_path_unverified
+Jalur inferensi ditemukan; premis dan kesimpulannya tetap belum diverifikasi.
+STRATEGI UTAMA DIAGNOSTIK> transitive_graph_search (preferensi umpan balik=0.00; bukan nilai kebenaran)
+STRATEGI:
+  - direct_lookup: no_direct_match — Tidak ada relasi langsung yang cocok di memori.
+  - transitive_graph_search: path_found — Menemukan 1 jalur is_a satu arah.
+  - counterevidence_scan: no_stored_counterevidence_found — Tidak ditemukan sanggahan eksplisit pada ruang lingkup yang diperiksa; ini bukan bukti bahwa sanggahan tidak ada.
+  - independent_integrity_verifier: integrity_passed_unverified — Jalur dan pembukuan lolos pemeriksaan struktural; konflik semantik (jika ada) dilaporkan terpisah dan fakta tetap belum terverifikasi.
+JALUR> kucing → mamalia → hewan
+BATASAN> audit memori, bukan verifikasi kebenaran dunia nyata
+COGNITIVE_UPDATE> siklus=4; WORKSPACE> reasoning_engine:multi_strategy_reasoning (0.72), reasoning_engine:strategy_transitive_graph_search (0.69), reasoning_engine:strategy_independent_integrity_verifier (0.69)
+
+KAMU> /feedback positive
+{
+  "reward": 1.0,
+  "learning_rate": 0.23,
+  "attention_gain": 1.02,
+  "policy_update": {
+    "action": "compare_reasoning_strategies",
+    "episode_id": "b8e7e75e65a0",
+    "old_value": 0.0,
+    "new_value": 0.2,
+    "strategy_update": {
+      "strategy": "transitive_graph_search",
+      "old_value": 0.0,
+      "new_value": 0.2,
+      "feedback_count": 1,
+      "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+    }
+  },
+  "strategy_learning": {
+    "transitive_graph_search": {
+      "user_feedback_value": 0.2,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    }
+  },
+  "action_values": {
+    "compare_reasoning_strategies": 0.2
+  },
+  "cognitive_cycle": 5,
+  "broadcast": [
+    {
+      "source": "neuromodulator",
+      "kind": "feedback_update",
+      "content": {
+        "reward": 1.0,
+        "policy_update": {
+          "action": "compare_reasoning_strategies",
+          "episode_id": "b8e7e75e65a0",
+          "old_value": 0.0,
+          "new_value": 0.2,
+          "strategy_update": {
+            "strategy": "transitive_graph_search",
+            "old_value": 0.0,
+            "new_value": 0.2,
+            "feedback_count": 1,
+            "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+          }
+        }
+      },
+      "confidence": 0.95,
+      "novelty": 0.35,
+      "urgency": 0.0,
+      "goal_relevance": 0.95,
+      "evidence": [
+        "perubahan atau rencana berasal dari perintah eksplisit pengguna"
+      ],
+      "score": 0.6399999999999999
+    },
+    {
+      "source": "prefrontal_cortex",
+      "kind": "active_goal",
+      "content": {
+        "goal": "uji pembelajaran",
+        "task_kind": "structured_command"
+      },
+      "confidence": 0.9,
+      "novelty": 0.1,
+      "urgency": 0.1,
+      "goal_relevance": 1.0,
+      "evidence": [
+        "tujuan aktif sistem"
+      ],
+      "score": 0.615
+    }
+  ],
+  "events": [
+    {
+      "sequence": 47,
+      "event_id": "20fd3712e9d5",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "perception",
+      "event_type": "input_received",
+      "payload": {
+        "text": "/feedback positive",
+        "channel": "structured_command"
+      }
+    },
+    {
+      "sequence": 48,
+      "event_id": "c41dfa5c0d74",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "language_area",
+      "event_type": "command_parsed",
+      "payload": {
+        "command_kind": "outcome_feedback"
+      }
+    },
+    {
+      "sequence": 49,
+      "event_id": "854c21ad129c",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "prefrontal_cortex",
+      "event_type": "candidate_proposed",
+      "payload": {
+        "kind": "active_goal",
+        "confidence": 0.9,
+        "content": {
+          "goal": "uji pembelajaran",
+          "task_kind": "structured_command"
+        }
+      }
+    },
+    {
+      "sequence": 50,
+      "event_id": "28577944450b",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "neuromodulator",
+      "event_type": "candidate_proposed",
+      "payload": {
+        "kind": "feedback_update",
+        "confidence": 0.95,
+        "content": {
+          "reward": 1.0,
+          "policy_update": {
+            "action": "compare_reasoning_strategies",
+            "episode_id": "b8e7e75e65a0",
+            "old_value": 0.0,
+            "new_value": 0.2,
+            "strategy_update": {
+              "strategy": "transitive_graph_search",
+              "old_value": 0.0,
+              "new_value": 0.2,
+              "feedback_count": 1,
+              "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+            }
+          }
+        }
+      }
+    },
+    {
+      "sequence": 51,
+      "event_id": "4b53b7cfe78d",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "global_workspace",
+      "event_type": "workspace_broadcast",
+      "payload": {
+        "items": [
+          {
+            "source": "neuromodulator",
+            "kind": "feedback_update",
+            "score": 0.64
+          },
+          {
+            "source": "prefrontal_cortex",
+            "kind": "active_goal",
+            "score": 0.615
+          }
+        ]
+      }
+    },
+    {
+      "sequence": 52,
+      "event_id": "dd1dabc997ec",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "neuromodulator",
+      "event_type": "feedback_applied",
+      "payload": {
+        "reward": 1.0,
+        "policy_update": {
+          "action": "compare_reasoning_strategies",
+          "episode_id": "b8e7e75e65a0",
+          "old_value": 0.0,
+          "new_value": 0.2,
+          "strategy_update": {
+            "strategy": "transitive_graph_search",
+            "old_value": 0.0,
+            "new_value": 0.2,
+            "feedback_count": 1,
+            "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+          }
+        }
+      }
+    },
+    {
+      "sequence": 53,
+      "event_id": "449b8b553532",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "executive_controller",
+      "event_type": "command_executed",
+      "payload": {
+        "action": "apply_feedback",
+        "mode": "explicit_user_command"
+      }
+    },
+    {
+      "sequence": 54,
+      "event_id": "ef8e8c808673",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "language_area",
+      "event_type": "response_generated",
+      "payload": {
+        "action": "apply_feedback",
+        "response": "Umpan balik positive diterapkan."
+      }
+    },
+    {
+      "sequence": 55,
+      "event_id": "6dd60ad24f6f",
+      "timestamp": "2026-10-21T12:01:22.807269+00:00",
+      "cycle": 5,
+      "source": "hippocampus",
+      "event_type": "episode_stored",
+      "payload": {
+        "episode_id": "94c8c3974c0f",
+        "action": "apply_feedback",
+        "interaction_type": "structured_command"
+      }
+    }
+  ],
+  "episode_id": "94c8c3974c0f"
+}
+
+KAMU> /strategies
+{
+  "strategy_learning": {
+    "transitive_graph_search": {
+      "user_feedback_value": 0.2,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    }
+  },
+  "note": "Nilai berasal dari umpan balik pengguna terhadap respons penalaran. Nilai ini bukan ukuran akurasi objektif, validitas logika, atau kebenaran dunia nyata.",
+  "all_strategies_still_run": true,
+  "learned_values_affect": "prioritas perhatian di Global Workspace secara terbatas",
+  "learned_values_do_not_affect": "kesimpulan berbasis bukti, status konflik, atau hasil verifier"
+}
+
+KAMU> /status
+{
+  "workspace": {
+    "cycle": 5,
+    "goal": "uji pembelajaran",
+    "arousal": 0.25,
+    "learning_rate": 0.23,
+    "prediction_error": 0.15,
+    "last_action": "apply_feedback",
+    "working_memory_size": 7,
+    "broadcast": [
+      {
+        "source": "neuromodulator",
+        "kind": "feedback_update",
+        "content": {
+          "reward": 1.0,
+          "policy_update": {
+            "action": "compare_reasoning_strategies",
+            "episode_id": "b8e7e75e65a0",
+            "old_value": 0.0,
+            "new_value": 0.2,
+            "strategy_update": {
+              "strategy": "transitive_graph_search",
+              "old_value": 0.0,
+              "new_value": 0.2,
+              "feedback_count": 1,
+              "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+            }
+          }
+        },
+        "confidence": 0.95,
+        "novelty": 0.35,
+        "urgency": 0.0,
+        "goal_relevance": 0.95,
+        "evidence": [
+          "perubahan atau rencana berasal dari perintah eksplisit pengguna"
+        ],
+        "score": 0.6399999999999999
+      },
+      {
+        "source": "prefrontal_cortex",
+        "kind": "active_goal",
+        "content": {
+          "goal": "uji pembelajaran",
+          "task_kind": "structured_command"
+        },
+        "confidence": 0.9,
+        "novelty": 0.1,
+        "urgency": 0.1,
+        "goal_relevance": 1.0,
+        "evidence": [
+          "tujuan aktif sistem"
+        ],
+        "score": 0.615
+      }
+    ]
+  },
+  "cognitive_cycles_this_run": 5,
+  "cognitive_cycles_total": 5,
+  "episodic_memories": 5,
+  "semantic_relations": 2,
+  "hypotheses": 0,
+  "hypothesis_evidence_records": 0,
+  "provenance_claims": 0,
+  "provenance_evidence_records": 0,
+  "provenance_external_checks": 0,
+  "memory_schema_version": 7,
+  "feedback_count": 1,
+  "average_reward": 1.0,
+  "action_values": {
+    "compare_reasoning_strategies": 0.2
+  },
+  "strategy_learning": {
+    "transitive_graph_search": {
+      "user_feedback_value": 0.2,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    }
+  },
+  "unresolved_contradictions": [],
+  "event_count_this_run": 55,
+  "needs": {
+    "energy": 0.99,
+    "novelty_seeking": 0.25,
+    "social_interaction": 0.3
+  },
+  "components": [
+    "thalamus_attention",
+    "working_memory",
+    "hippocampus",
+    "amygdala",
+    "basal_ganglia",
+    "prefrontal_cortex",
+    "cerebellum",
+    "hypothalamus_sleep",
+    "neuromodulator",
+    "default_mode_network",
+    "language_area",
+    "perception",
+    "world_model",
+    "hypothesis_system",
+    "claim_evidence_provenance_ledger",
+    "independent_verifier",
+    "multi_strategy_reasoner",
+    "global_workspace"
+  ],
+  "llm_used": false
+}
+
+KAMU> kucing bukan mamalia
+AI> Saya mencatat relasi: kucing↛mamalia (baru). Ini adalah pernyataan pengguna, belum diverifikasi secara independen. PERINGATAN: ada pernyataan yang bertentangan dan belum terselesaikan.
+WORKSPACE> hippocampus:episodic_retrieval (0.66), prefrontal_cortex:active_goal (0.61), world_model:proposed_relation (0.61)
+ACTION> learn_relation (utility=0.95)
+CONFLICT> 1 kontradiksi belum terselesaikan; lihat /conflicts
+
+KAMU> /reason kucing | is_a | mamalia
+KESIMPULAN> conflicted
+Ada pernyataan yang bertentangan langsung di memori; kesimpulan ditahan.
+STRATEGI UTAMA DIAGNOSTIK> counterevidence_scan (preferensi umpan balik=0.00; bukan nilai kebenaran)
+STRATEGI:
+  - direct_lookup: match_found — Ditemukan 1 relasi langsung yang cocok.
+  - transitive_graph_search: path_found — Menemukan 1 jalur is_a satu arah.
+  - counterevidence_scan: counterevidence_found — Ada 1 sanggahan eksplisit di memori.
+  - independent_integrity_verifier: integrity_passed_unverified — Jalur dan pembukuan lolos pemeriksaan struktural; konflik semantik (jika ada) dilaporkan terpisah dan fakta tetap belum terverifikasi.
+JALUR> kucing → mamalia
+SANGGAHAN TERSIMPAN> 1
+BATASAN> audit memori, bukan verifikasi kebenaran dunia nyata
+COGNITIVE_UPDATE> siklus=7; WORKSPACE> reasoning_engine:strategy_counterevidence_scan (0.85), reasoning_engine:multi_strategy_reasoning (0.73), reasoning_engine:strategy_transitive_graph_search (0.71)
+
+KAMU> /feedback negative
+{
+  "reward": -1.0,
+  "learning_rate": 0.2,
+  "attention_gain": 1.0,
+  "policy_update": {
+    "action": "compare_reasoning_strategies",
+    "episode_id": "b64d24fced86",
+    "old_value": 0.2,
+    "new_value": -0.07600000000000001,
+    "strategy_update": {
+      "strategy": "counterevidence_scan",
+      "old_value": 0.0,
+      "new_value": -0.23,
+      "feedback_count": 1,
+      "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+    }
+  },
+  "strategy_learning": {
+    "counterevidence_scan": {
+      "user_feedback_value": -0.23,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    },
+    "transitive_graph_search": {
+      "user_feedback_value": 0.2,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    }
+  },
+  "action_values": {
+    "compare_reasoning_strategies": -0.07600000000000001
+  },
+  "cognitive_cycle": 8,
+  "broadcast": [
+    {
+      "source": "neuromodulator",
+      "kind": "feedback_update",
+      "content": {
+        "reward": -1.0,
+        "policy_update": {
+          "action": "compare_reasoning_strategies",
+          "episode_id": "b64d24fced86",
+          "old_value": 0.2,
+          "new_value": -0.07600000000000001,
+          "strategy_update": {
+            "strategy": "counterevidence_scan",
+            "old_value": 0.0,
+            "new_value": -0.23,
+            "feedback_count": 1,
+            "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+          }
+        }
+      },
+      "confidence": 0.95,
+      "novelty": 0.35,
+      "urgency": 0.0,
+      "goal_relevance": 0.95,
+      "evidence": [
+        "perubahan atau rencana berasal dari perintah eksplisit pengguna"
+      ],
+      "score": 0.6271999999999999
+    },
+    {
+      "source": "prefrontal_cortex",
+      "kind": "active_goal",
+      "content": {
+        "goal": "uji pembelajaran",
+        "task_kind": "structured_command"
+      },
+      "confidence": 0.9,
+      "novelty": 0.1,
+      "urgency": 0.1,
+      "goal_relevance": 1.0,
+      "evidence": [
+        "tujuan aktif sistem"
+      ],
+      "score": 0.6027
+    }
+  ],
+  "events": [
+    {
+      "sequence": 82,
+      "event_id": "d316e760d0f5",
+      "timestamp": "2026-10-21T12:01:28.846127+00:00",
+      "cycle": 8,
+      "source": "perception",
+      "event_type": "input_received",
+      "payload": {
+        "text": "/feedback negative",
+        "channel": "structured_command"
+      }
+    },
+    {
+      "sequence": 83,
+      "event_id": "f9f3d70f92c9",
+      "timestamp": "2026-10-21T12:01:28.846127+00:00",
+      "cycle": 8,
+      "source": "language_area",
+      "event_type": "command_parsed",
+      "payload": {
+        "command_kind": "outcome_feedback"
+      }
+    },
+    {
+      "sequence": 84,
+      "event_id": "fc9ec706b4ed",
+      "timestamp": "2026-10-21T12:01:28.848136+00:00",
+      "cycle": 8,
+      "source": "prefrontal_cortex",
+      "event_type": "candidate_proposed",
+      "payload": {
+        "kind": "active_goal",
+        "confidence": 0.9,
+        "content": {
+          "goal": "uji pembelajaran",
+          "task_kind": "structured_command"
+        }
+      }
+    },
+    {
+      "sequence": 85,
+      "event_id": "ff4272c48e66",
+      "timestamp": "2026-10-21T12:01:28.850141+00:00",
+      "cycle": 8,
+      "source": "neuromodulator",
+      "event_type": "candidate_proposed",
+      "payload": {
+        "kind": "feedback_update",
+        "confidence": 0.95,
+        "content": {
+          "reward": -1.0,
+          "policy_update": {
+            "action": "compare_reasoning_strategies",
+            "episode_id": "b64d24fced86",
+            "old_value": 0.2,
+            "new_value": -0.07600000000000001,
+            "strategy_update": {
+              "strategy": "counterevidence_scan",
+              "old_value": 0.0,
+              "new_value": -0.23,
+              "feedback_count": 1,
+              "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+            }
+          }
+        }
+      }
+    },
+    {
+      "sequence": 86,
+      "event_id": "d2a585cd230b",
+      "timestamp": "2026-10-21T12:01:28.850141+00:00",
+      "cycle": 8,
+      "source": "global_workspace",
+      "event_type": "workspace_broadcast",
+      "payload": {
+        "items": [
+          {
+            "source": "neuromodulator",
+            "kind": "feedback_update",
+            "score": 0.627
+          },
+          {
+            "source": "prefrontal_cortex",
+            "kind": "active_goal",
+            "score": 0.603
+          }
+        ]
+      }
+    },
+    {
+      "sequence": 87,
+      "event_id": "1f8e152215f7",
+      "timestamp": "2026-10-21T12:01:28.850141+00:00",
+      "cycle": 8,
+      "source": "neuromodulator",
+      "event_type": "feedback_applied",
+      "payload": {
+        "reward": -1.0,
+        "policy_update": {
+          "action": "compare_reasoning_strategies",
+          "episode_id": "b64d24fced86",
+          "old_value": 0.2,
+          "new_value": -0.07600000000000001,
+          "strategy_update": {
+            "strategy": "counterevidence_scan",
+            "old_value": 0.0,
+            "new_value": -0.23,
+            "feedback_count": 1,
+            "interpretation": "preferensi pengguna terhadap respons penalaran; bukan ukuran kebenaran objektif"
+          }
+        }
+      }
+    },
+    {
+      "sequence": 88,
+      "event_id": "4956a308f011",
+      "timestamp": "2026-10-21T12:01:28.850141+00:00",
+      "cycle": 8,
+      "source": "executive_controller",
+      "event_type": "command_executed",
+      "payload": {
+        "action": "apply_feedback",
+        "mode": "explicit_user_command"
+      }
+    },
+    {
+      "sequence": 89,
+      "event_id": "12a7c2e06d05",
+      "timestamp": "2026-10-21T12:01:28.850141+00:00",
+      "cycle": 8,
+      "source": "language_area",
+      "event_type": "response_generated",
+      "payload": {
+        "action": "apply_feedback",
+        "response": "Umpan balik negative diterapkan."
+      }
+    },
+    {
+      "sequence": 90,
+      "event_id": "c8bb1d3c134b",
+      "timestamp": "2026-10-21T12:01:28.852147+00:00",
+      "cycle": 8,
+      "source": "hippocampus",
+      "event_type": "episode_stored",
+      "payload": {
+        "episode_id": "e1d3e1a20565",
+        "action": "apply_feedback",
+        "interaction_type": "structured_command"
+      }
+    }
+  ],
+  "episode_id": "e1d3e1a20565"
+}
+
+KAMU> /reason kucing | is_a | mamalia
+KESIMPULAN> conflicted
+Ada pernyataan yang bertentangan langsung di memori; kesimpulan ditahan.
+STRATEGI UTAMA DIAGNOSTIK> counterevidence_scan (preferensi umpan balik=-0.23; bukan nilai kebenaran)
+STRATEGI:
+  - direct_lookup: match_found — Ditemukan 1 relasi langsung yang cocok.
+  - transitive_graph_search: path_found — Menemukan 1 jalur is_a satu arah.
+  - counterevidence_scan: counterevidence_found — Ada 1 sanggahan eksplisit di memori.
+  - independent_integrity_verifier: integrity_passed_unverified — Jalur dan pembukuan lolos pemeriksaan struktural; konflik semantik (jika ada) dilaporkan terpisah dan fakta tetap belum terverifikasi.
+JALUR> kucing → mamalia
+SANGGAHAN TERSIMPAN> 1
+BATASAN> audit memori, bukan verifikasi kebenaran dunia nyata
+COGNITIVE_UPDATE> siklus=9; WORKSPACE> reasoning_engine:strategy_counterevidence_scan (0.84), reasoning_engine:multi_strategy_reasoning (0.72), reasoning_engine:strategy_transitive_graph_search (0.70)
+
+KAMU> /strategies
+{
+  "strategy_learning": {
+    "counterevidence_scan": {
+      "user_feedback_value": -0.23,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    },
+    "transitive_graph_search": {
+      "user_feedback_value": 0.2,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    }
+  },
+  "note": "Nilai berasal dari umpan balik pengguna terhadap respons penalaran. Nilai ini bukan ukuran akurasi objektif, validitas logika, atau kebenaran dunia nyata.",
+  "all_strategies_still_run": true,
+  "learned_values_affect": "prioritas perhatian di Global Workspace secara terbatas",
+  "learned_values_do_not_affect": "kesimpulan berbasis bukti, status konflik, atau hasil verifier"
+}
+
+KAMU> /conflicts
+[
+  {
+    "subject": "kucing",
+    "object": "mamalia",
+    "status": "unresolved",
+    "reason": "positive and negative user assertions coexist",
+    "positive_sources": [
+      "kucing adalah mamalia"
+    ],
+    "negative_sources": [
+      "kucing bukan mamalia"
+    ]
+  }
+]
+
+KAMU> /status
+{
+  "workspace": {
+    "cycle": 9,
+    "goal": "uji pembelajaran",
+    "arousal": 0.25,
+    "learning_rate": 0.2,
+    "prediction_error": 0.05,
+    "last_action": "compare_reasoning_strategies",
+    "working_memory_size": 7,
+    "broadcast": [
+      {
+        "source": "reasoning_engine",
+        "kind": "strategy_counterevidence_scan",
+        "content": {
+          "strategy": "counterevidence_scan",
+          "status": "counterevidence_found",
+          "finding": "Ada 1 sanggahan eksplisit di memori.",
+          "user_feedback_value": -0.23,
+          "user_feedback_count": 1
+        },
+        "confidence": 0.96,
+        "novelty": 0.65,
+        "urgency": 0.75,
+        "goal_relevance": 0.95,
+        "evidence": [
+          "hasil strategi dari memori terstruktur; tidak mengonfirmasi fakta eksternal"
+        ],
+        "score": 0.83545
+      },
+      {
+        "source": "reasoning_engine",
+        "kind": "multi_strategy_reasoning",
+        "content": {
+          "query": {
+            "subject": "kucing",
+            "relation": "is_a",
+            "object": "mamalia"
+          },
+          "conclusion_status": "conflicted",
+          "selected_diagnostic_strategy": "counterevidence_scan",
+          "primary_strategy": "counterevidence_scan",
+          "primary_strategy_user_feedback_value": -0.23,
+          "strategy_count": 4,
+          "counterevidence_count": 1
+        },
+        "confidence": 0.95,
+        "novelty": 0.8,
+        "urgency": 0.0,
+        "goal_relevance": 0.95,
+        "evidence": [
+          "perubahan atau rencana berasal dari perintah eksplisit pengguna"
+        ],
+        "score": 0.7153999999999999
+      },
+      {
+        "source": "reasoning_engine",
+        "kind": "strategy_transitive_graph_search",
+        "content": {
+          "strategy": "transitive_graph_search",
+          "status": "path_found",
+          "finding": "Menemukan 1 jalur is_a satu arah.",
+          "user_feedback_value": 0.2,
+          "user_feedback_count": 1
+        },
+        "confidence": 0.86,
+        "novelty": 0.65,
+        "urgency": 0.16999999999999998,
+        "goal_relevance": 0.95,
+        "evidence": [
+          "hasil strategi dari memori terstruktur; tidak mengonfirmasi fakta eksternal"
+        ],
+        "score": 0.69727
+      }
+    ]
+  },
+  "cognitive_cycles_this_run": 9,
+  "cognitive_cycles_total": 9,
+  "episodic_memories": 9,
+  "semantic_relations": 3,
+  "hypotheses": 0,
+  "hypothesis_evidence_records": 0,
+  "provenance_claims": 0,
+  "provenance_evidence_records": 0,
+  "provenance_external_checks": 0,
+  "memory_schema_version": 7,
+  "feedback_count": 2,
+  "average_reward": 0.0,
+  "action_values": {
+    "compare_reasoning_strategies": -0.07600000000000001
+  },
+  "strategy_learning": {
+    "counterevidence_scan": {
+      "user_feedback_value": -0.23,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    },
+    "transitive_graph_search": {
+      "user_feedback_value": 0.2,
+      "feedback_count": 1,
+      "meaning": "preferensi pengguna, bukan akurasi faktual atau bukti kebenaran"
+    }
+  },
+  "unresolved_contradictions": [
+    {
+      "subject": "kucing",
+      "object": "mamalia",
+      "status": "unresolved",
+      "reason": "positive and negative user assertions coexist",
+      "positive_sources": [
+        "kucing adalah mamalia"
+      ],
+      "negative_sources": [
+        "kucing bukan mamalia"
+      ]
+    }
+  ],
+  "event_count_this_run": 103,
+  "needs": {
+    "energy": 0.985,
+    "novelty_seeking": 0.25,
+    "social_interaction": 0.3
+  },
+  "components": [
+    "thalamus_attention",
+    "working_memory",
+    "hippocampus",
+    "amygdala",
+    "basal_ganglia",
+    "prefrontal_cortex",
+    "cerebellum",
+    "hypothalamus_sleep",
+    "neuromodulator",
+    "default_mode_network",
+    "language_area",
+    "perception",
+    "world_model",
+    "hypothesis_system",
+    "claim_evidence_provenance_ledger",
+    "independent_verifier",
+    "multi_strategy_reasoner",
+    "global_workspace"
+  ],
+  "llm_used": false
+}
 
 KAMU> quit
 Memori disimpan. Sampai jumpa.
