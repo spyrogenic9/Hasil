@@ -1,4 +1,3 @@
-putra@L MINGW64 ~/Downloads/Video/BRAIN
 $ python -m compileall -q .
 python -m unittest discover -s tests -v
 python -m brain_ai.cli
@@ -12,7 +11,20 @@ test_selected_action_matches_response_route (test_brain.CognitiveBrainTests.test
 test_transitive_is_a_inference_is_labeled_unverified (test_brain.CognitiveBrainTests.test_transitive_is_a_inference_is_labeled_unverified) ... ok
 test_v01_relation_migrates_from_source_text (test_brain.CognitiveBrainTests.test_v01_relation_migrates_from_source_text) ... ok
 test_workspace_broadcast_is_bounded (test_brain.CognitiveBrainTests.test_workspace_broadcast_is_bounded) ... ok
-test_evidence_ledger (unittest.loader._FailedTest.test_evidence_ledger) ... ERROR
+test_audit_does_not_claim_truth_verification (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_audit_does_not_claim_truth_verification) ... ok
+test_claim_context_partitions_claim_identity (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_claim_context_partitions_claim_identity) ... ok
+test_conflict_is_preserved (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_conflict_is_preserved) ... ok
+test_exact_duplicate_is_ignored (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_exact_duplicate_is_ignored) ... ok
+test_external_check_cannot_reference_another_claims_evidence (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_external_check_cannot_reference_another_claims_evidence) ... ok
+test_external_check_does_not_delete_conflict (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_external_check_does_not_delete_conflict) ... ok
+test_invalid_ledger_payload_is_rejected_without_reset (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_invalid_ledger_payload_is_rejected_without_reset) ... ok
+test_invalid_references_are_rejected (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_invalid_references_are_rejected) ... ok
+test_invalid_stance_and_blank_source_are_rejected (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_invalid_stance_and_blank_source_are_rejected) ... ok
+test_neutral_evidence_does_not_become_support (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_neutral_evidence_does_not_become_support) ... ok
+test_no_evidence_is_not_a_truth_claim (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_no_evidence_is_not_a_truth_claim) ... ok
+test_persistence_after_reopen (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_persistence_after_reopen) ... ok
+test_repetition_from_same_source_is_not_independent (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_repetition_from_same_source_is_not_independent) ... ok
+test_shared_independent_group_counts_as_one_declared_source_group (test_evidence_ledger.IntegratedEvidenceLedgerTests.test_shared_independent_group_counts_as_one_declared_source_group) ... ok
 test_conflicting_assertions_are_exposed_but_not_resolved_automatically (test_v03.CognitiveBrainV03Tests.test_conflicting_assertions_are_exposed_but_not_resolved_automatically) ... ok
 test_event_trace_exposes_cognitive_cycle (test_v03.CognitiveBrainV03Tests.test_event_trace_exposes_cognitive_cycle) ... ok
 test_feedback_updates_persistent_action_value (test_v03.CognitiveBrainV03Tests.test_feedback_updates_persistent_action_value) ... ok
@@ -75,25 +87,10 @@ test_saved_state_schema_is_v7 (test_v09.CognitiveBrainV09EvidenceLedgerTests.tes
 test_standalone_ledger_loads_persisted_checks (test_v09.CognitiveBrainV09EvidenceLedgerTests.test_standalone_ledger_loads_persisted_checks) ... ok
 test_verifier_audits_provenance_ledger_without_claiming_truth (test_v09.CognitiveBrainV09EvidenceLedgerTests.test_verifier_audits_provenance_ledger_without_claiming_truth) ... ok
 
-======================================================================
-ERROR: test_evidence_ledger (unittest.loader._FailedTest.test_evidence_ledger)
 ----------------------------------------------------------------------
-ImportError: Failed to import test module: test_evidence_ledger
-Traceback (most recent call last):
-  File "C:\Users\putra\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 382, in _find_test_path
-    module = self._get_module_from_name(name)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\putra\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 325, in _get_module_from_name
-    __import__(name)
-  File "C:\Users\putra\Downloads\Video\BRAIN\tests\test_evidence_ledger.py", line 6, in <module>
-    from brain_ai_evidence import EvidenceLedger, LedgerError
-ModuleNotFoundError: No module named 'brain_ai_evidence'
+Ran 85 tests in 0.833s
 
-
-----------------------------------------------------------------------
-Ran 72 tests in 0.851s
-
-FAILED (errors=1)
+OK
 Human-Inspired Cognitive AI v0.9 — tanpa LLM
 Perintah: /goal TUJUAN | /status | /facts | /conflicts | /events | /memories | /verify ID_ATAU_KONSEP | /reason SUBJEK | RELASI | OBJEK | /strategies | /feedback POSITIVE|NEGATIVE|NEUTRAL | /quit
 Hipotesis: /hypothesis add GRUP | KLAIM | PREDIKSI | /hypotheses [GRUP] | /hypothesis compare GRUP | /hypothesis test ID
