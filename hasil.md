@@ -3,7 +3,7 @@ $ python -m brain_ai.cli --version
 python -m compileall -q brain_ai tests scripts
 python -m unittest discover -s tests -v
 python scripts/verify_release.py
-cli.py 0.16.0
+cli.py 0.17.0
 test_every_fixture_has_all_six_semantics_preserving_variants (test_adversarial_suite_v015.AdversarialBoundarySuiteCoreTests.test_every_fixture_has_all_six_semantics_preserving_variants) ... ok
 test_invalid_seed_is_rejected (test_adversarial_suite_v015.AdversarialBoundarySuiteCoreTests.test_invalid_seed_is_rejected) ... ok
 test_report_distinguishes_oracle_match_from_external_truth (test_adversarial_suite_v015.AdversarialBoundarySuiteCoreTests.test_report_distinguishes_oracle_match_from_external_truth) ... ok
@@ -24,6 +24,18 @@ test_selected_action_matches_response_route (test_brain.CognitiveBrainTests.test
 test_transitive_is_a_inference_is_labeled_unverified (test_brain.CognitiveBrainTests.test_transitive_is_a_inference_is_labeled_unverified) ... ok
 test_v01_relation_migrates_from_source_text (test_brain.CognitiveBrainTests.test_v01_relation_migrates_from_source_text) ... ok
 test_workspace_broadcast_is_bounded (test_brain.CognitiveBrainTests.test_workspace_broadcast_is_bounded) ... ok
+test_compositions_are_multi_motif_and_holdout_recipes_are_disjoint (test_composition_lab_v017.CompositionalLabCoreTests.test_compositions_are_multi_motif_and_holdout_recipes_are_disjoint) ... ok
+test_default_composition_suite_matches_internal_oracle_on_train_and_holdout (test_composition_lab_v017.CompositionalLabCoreTests.test_default_composition_suite_matches_internal_oracle_on_train_and_holdout) ... ok
+test_holdout_only_history_never_changes_training_priority (test_composition_lab_v017.CompositionalLabCoreTests.test_holdout_only_history_never_changes_training_priority) ... ok
+test_invalid_case_counts_and_seed_are_rejected (test_composition_lab_v017.CompositionalLabCoreTests.test_invalid_case_counts_and_seed_are_rejected) ... ok
+test_isolation_flags_and_epistemic_scope_are_explicit (test_composition_lab_v017.CompositionalLabCoreTests.test_isolation_flags_and_epistemic_scope_are_explicit) ... ok
+test_only_training_mismatch_changes_composition_priority (test_composition_lab_v017.CompositionalLabCoreTests.test_only_training_mismatch_changes_composition_priority) ... ok
+test_same_seed_is_deterministic_for_cases_priority_and_outcomes (test_composition_lab_v017.CompositionalLabCoreTests.test_same_seed_is_deterministic_for_cases_priority_and_outcomes) ... ok
+test_training_diagnosis_prioritizes_related_composition (test_composition_lab_v017.CompositionalLabCoreTests.test_training_diagnosis_prioritizes_related_composition) ... ok
+test_cli_search_report_and_status (test_composition_lab_v017.CompositionalLabPersistenceTests.test_cli_search_report_and_status) ... ok
+test_report_persists_across_restart_and_ids_are_monotonic (test_composition_lab_v017.CompositionalLabPersistenceTests.test_report_persists_across_restart_and_ids_are_monotonic) ... ok
+test_run_does_not_mutate_user_facts_learning_or_policy (test_composition_lab_v017.CompositionalLabPersistenceTests.test_run_does_not_mutate_user_facts_learning_or_policy) ... ok
+test_schema_8_through_15_migrate_without_losing_core_learning_state (test_composition_lab_v017.CompositionalLabPersistenceTests.test_schema_8_through_15_migrate_without_losing_core_learning_state) ... ok
 test_cli_rejects_invalid_search_args_without_crashing (test_counterexample_lab_v014.CounterexampleCLITests.test_cli_rejects_invalid_search_args_without_crashing) ... ok
 test_cli_runs_search_and_report (test_counterexample_lab_v014.CounterexampleCLITests.test_cli_runs_search_and_report) ... ok
 test_minimizer_deletes_irrelevant_facts_while_preserving_mocked_mismatch (test_counterexample_lab_v014.CounterexampleOracleTests.test_minimizer_deletes_irrelevant_facts_while_preserving_mocked_mismatch) ... ok
@@ -218,26 +230,28 @@ test_standalone_ledger_loads_persisted_checks (test_v09.CognitiveBrainV09Evidenc
 test_verifier_audits_provenance_ledger_without_claiming_truth (test_v09.CognitiveBrainV09EvidenceLedgerTests.test_verifier_audits_provenance_ledger_without_claiming_truth) ... ok
 
 ----------------------------------------------------------------------
-Ran 212 tests in 29.483s
+Ran 224 tests in 60.775s
 
 OK
-PASS | version_identity_consistency | VERSION.txt=0.16.0; pyproject=0.16.0; package=0.16.0; cli=cli.py 0.16.0
+PASS | version_identity_consistency | VERSION.txt=0.17.0; pyproject=0.17.0; package=0.17.0; cli=cli.py 0.17.0
 PASS | compileall |
-PASS | cli_smoke_utf-8 | exit=0; markers=True; bytes=48060
-PASS | cli_smoke_cp1252 | exit=0; markers=True; bytes=48070
-PASS | generalization_cli_smoke | exit=0; markers=True; bytes=22704
-PASS | crossfit_routing_cli_smoke | exit=0; markers=True; bytes=72522
-PASS | holdout_isolation_cli_smoke | exit=0; markers=True; bytes=104223
-PASS | oracle_counterexample_cli_smoke | exit=0; markers=True; bytes=26076
-PASS | oracle_counterexample_250_case_stress | exit=0; markers=True; bytes=110719
-PASS | systematic_boundary_suite_cli_smoke | exit=0; markers=True; bytes=14480
-PASS | failure_guided_sealed_holdout_cli_smoke | exit=0; markers=True; bytes=26754
+PASS | cli_smoke_utf-8 | exit=0; markers=True; bytes=48353
+PASS | cli_smoke_cp1252 | exit=0; markers=True; bytes=48363
+PASS | generalization_cli_smoke | exit=0; markers=True; bytes=22997
+PASS | crossfit_routing_cli_smoke | exit=0; markers=True; bytes=72815
+PASS | holdout_isolation_cli_smoke | exit=0; markers=True; bytes=104516
+PASS | oracle_counterexample_cli_smoke | exit=0; markers=True; bytes=26369
+PASS | oracle_counterexample_250_case_stress | exit=0; markers=True; bytes=110833
+PASS | systematic_boundary_suite_cli_smoke | exit=0; markers=True; bytes=14773
+PASS | failure_guided_sealed_holdout_cli_smoke | exit=0; markers=True; bytes=27047
+PASS | compositional_graph_interaction_cli_smoke | exit=0; markers=True; bytes=42767
+PASS | compositional_graph_interaction_96_case_stress | exit=0; markers=True; bytes=64466
 
-Release verification: PASS; 11/11 gates passed.
+Release verification: PASS; 13/13 gates passed.
 
 putra@L MINGW64 ~/Downloads/Video/BRAIN
-$ python -m brain_ai.cli --memory failure_guided_test_state.json
-Human-Inspired Cognitive AI v0.16.0 — tanpa LLM
+$ python -m brain_ai.cli --memory composition_test_state.json
+Human-Inspired Cognitive AI v0.17.0 — tanpa LLM
 Perintah: /goal TUJUAN | /status | /facts | /conflicts | /events | /memories | /verify ID_ATAU_KONSEP | /reason SUBJEK | RELASI | OBJEK | /strategies | /feedback POSITIVE|NEGATIVE|NEUTRAL | /quit
 Hipotesis: /hypothesis add GRUP | KLAIM | PREDIKSI | /hypotheses [GRUP] | /hypothesis compare GRUP | /hypothesis test ID
 Bukti hipotesis: /evidence H0001 support|against|neutral | DESKRIPSI | /evidence-list H0001
@@ -252,181 +266,154 @@ Mutation lab: /mutation-propose CONTEXT | STRATEGY | RATIONALE; /mutation-report
 Generalization lab: /generalization-evaluate; /generalization-report
 Routing evaluator: /learning-benchmark train|holdout|all dengan cross-fit; /routing-report
 Failure-guided discovery: /failure-guided-search [TRAIN_CASES 1..120] [HOLDOUT_CASES 1..60] [SEED]; /failure-guided-report
+Compositional lab: /compositional-search [TRAIN_CASES 1..96] [HOLDOUT_CASES 1..48] [SEED]; /compositional-report
 Counterexample lab: /counterexample-search [JUMLAH_KASUS] [SEED]; /counterexample-report
 Boundary suite: /boundary-suite [SEED]; /boundary-report (144 systematic topology/transform checks)
 Bahasa sederhana: kucing adalah mamalia; jika hujan maka jalan basah; hipotesis tentang cuaca?
 
-KAMU> /failure-guided-search 40 20 16001
+KAMU> /compositional-search 32 16 17001
 {
-  "evaluation_id": "FGE00001",
-  "suite_version": "failure-guided-discovery-sealed-holdout-v1",
-  "seed": 16001,
-  "training_seed": 16001,
-  "holdout_seed": 5908802,
-  "training_case_count": 40,
+  "evaluation_id": "CGE00001",
+  "suite_version": "compositional-graph-interaction-sealed-holdout-v1",
+  "seed": 17001,
+  "training_seed": 17001,
+  "holdout_seed": 5004238,
+  "training_case_count": 32,
   "training": {
-    "matched": 40,
+    "matched": 32,
     "mismatches": 0,
     "match_rate": 1.0,
     "all_matched": true,
-    "family_summary": {
-      "target_conflict": {
+    "composition_summary": {
+      "direct_plus_disconnected_conflict_cycle": {
         "cases": 4,
         "matches": 4,
         "mismatches": 0
       },
-      "path_conflict": {
+      "chain_plus_route_self_loop": {
         "cases": 4,
         "matches": 4,
         "mismatches": 0
       },
-      "deep_path": {
+      "target_conflict_plus_alternate_route": {
         "cases": 4,
         "matches": 4,
         "mismatches": 0
       },
-      "normalization": {
+      "alternate_route_with_conflicted_branch": {
         "cases": 4,
         "matches": 4,
         "mismatches": 0
       },
-      "alternate_routes": {
+      "deep_bridge_conflict_plus_cycle_noise": {
         "cases": 4,
         "matches": 4,
         "mismatches": 0
       },
-      "cycle_route": {
+      "duplicate_prefix_plus_predicate_decoy": {
         "cases": 4,
         "matches": 4,
         "mismatches": 0
       },
-      "unsupported_decoy": {
+      "cycle_touching_route_plus_clean_bridge": {
         "cases": 4,
         "matches": 4,
         "mismatches": 0
       },
-      "duplicate_edge": {
-        "cases": 4,
-        "matches": 4,
-        "mismatches": 0
-      },
-      "self_loop": {
-        "cases": 4,
-        "matches": 4,
-        "mismatches": 0
-      },
-      "irrelevant_conflict": {
+      "unsupported_query_plus_disconnected_negative_cycle": {
         "cases": 4,
         "matches": 4,
         "mismatches": 0
       }
     }
   },
-  "holdout_case_count": 20,
+  "holdout_case_count": 16,
   "holdout": {
-    "matched": 20,
+    "matched": 16,
     "mismatches": 0,
     "match_rate": 1.0,
     "all_matched": true,
-    "family_summary": {
-      "three_route_mixed_conflict": {
+    "composition_summary": {
+      "direct_plus_conflicted_alternate_path": {
         "cases": 2,
         "matches": 2,
         "mismatches": 0
       },
-      "cycle_after_target": {
+      "long_route_plus_two_cycles": {
         "cases": 2,
         "matches": 2,
         "mismatches": 0
       },
-      "same_node_negative": {
+      "target_negative_plus_three_routes": {
         "cases": 2,
         "matches": 2,
         "mismatches": 0
       },
-      "disconnected_cycle_only": {
+      "clean_alternate_routes_plus_disconnected_conflict": {
         "cases": 2,
         "matches": 2,
         "mismatches": 0
       },
-      "normalized_opposing_assertions": {
+      "clean_path_plus_reverse_cycle_decoy": {
         "cases": 2,
         "matches": 2,
         "mismatches": 0
       },
-      "reverse_chain_only": {
+      "positive_self_loop_plus_disconnected_cycle": {
         "cases": 2,
         "matches": 2,
         "mismatches": 0
       },
-      "deep_bridge_conflict": {
+      "same_node_negative_plus_positive_cycle": {
         "cases": 2,
         "matches": 2,
         "mismatches": 0
       },
-      "relation_decoy_chain": {
-        "cases": 2,
-        "matches": 2,
-        "mismatches": 0
-      },
-      "positive_self_loop_only": {
-        "cases": 2,
-        "matches": 2,
-        "mismatches": 0
-      },
-      "cycle_near_target": {
+      "unsupported_query_plus_duplicate_predicate_decoys": {
         "cases": 2,
         "matches": 2,
         "mismatches": 0
       }
     }
   },
-  "training_pattern_priority": [
+  "training_composition_priority": [
     {
-      "family": "target_conflict",
+      "composition": "direct_plus_disconnected_conflict_cycle",
       "historical_signal_score": 0
     },
     {
-      "family": "path_conflict",
+      "composition": "chain_plus_route_self_loop",
       "historical_signal_score": 0
     },
     {
-      "family": "deep_path",
+      "composition": "target_conflict_plus_alternate_route",
       "historical_signal_score": 0
     },
     {
-      "family": "normalization",
+      "composition": "alternate_route_with_conflicted_branch",
       "historical_signal_score": 0
     },
     {
-      "family": "alternate_routes",
+      "composition": "deep_bridge_conflict_plus_cycle_noise",
       "historical_signal_score": 0
     },
     {
-      "family": "cycle_route",
+      "composition": "duplicate_prefix_plus_predicate_decoy",
       "historical_signal_score": 0
     },
     {
-      "family": "unsupported_decoy",
+      "composition": "cycle_touching_route_plus_clean_bridge",
       "historical_signal_score": 0
     },
     {
-      "family": "duplicate_edge",
-      "historical_signal_score": 0
-    },
-    {
-      "family": "self_loop",
-      "historical_signal_score": 0
-    },
-    {
-      "family": "irrelevant_conflict",
+      "composition": "unsupported_query_plus_disconnected_negative_cycle",
       "historical_signal_score": 0
     }
   ],
-  "priority_basis": "coverage_priority_fallback_no_historical_mismatch",
+  "priority_basis": "coverage_fallback_no_historical_training_mismatch",
   "historical_failure_signal_count": 0,
   "mismatch_review_queue": [],
-  "candidate_fix_status": "no_counterexample_found_no_fix_auto_promoted",
+  "candidate_fix_status": "no_composition_counterexample_found_no_fix_auto_promoted",
   "isolation_invariants": {
     "user_facts_write_count": 0,
     "training_ledger_write_count": 0,
@@ -436,7 +423,7 @@ KAMU> /failure-guided-search 40 20 16001
     "holdout_labels_excluded_from_priority": true,
     "holdout_not_added_to_training_ledger": true,
     "training_and_holdout_case_ids_disjoint": true,
-    "training_and_holdout_family_templates_disjoint": true,
+    "training_and_holdout_compositions_disjoint": true,
     "separate_seed_namespaces": true,
     "user_facts_unchanged": true,
     "training_ledger_unchanged": true,
@@ -445,75 +432,65 @@ KAMU> /failure-guided-search 40 20 16001
   },
   "isolation_passed": true,
   "all_matched": true,
-  "epistemic_status": "internal_synthetic_graph_diagnostic_not_external_truth_verification",
-  "scope_note": "Training cases prioritize historically declared failure patterns or coverage fallback. Holdout uses separate template families and seed, and is evaluated only after split. Detected mismatches are minimized and queued for source-code review; no automatic source repair or policy promotion occurs. Agreement is relative to the internal bounded is_a graph oracle, not external factual truth or general intelligence."
+  "epistemic_status": "internal_synthetic_composition_oracle_not_external_truth_verification",
+  "scope_note": "This lab tests combinations of graph motifs, not external-world truth. Training priority consumes only declared training-side failures. Holdout uses separate recipe families, IDs, and seed namespace; its cases and labels are never passed to the priority extractor. Mismatches are minimized and queued for source review; no automatic source repair, fact mutation, training update, or policy promotion occurs."
 }
-FAILURE_GUIDED> FGE00001 status=PASS train=40/40 holdout=20/20 mismatches=0
-CATATAN> mismatch diminimalkan untuk tinjauan kode; holdout tidak dipakai untuk prioritas/training dan tidak ada perbaikan otomatis.
-COGNITIVE_UPDATE> siklus=1; WORKSPACE> failure_guided_lab:failure_guided_discovery_report (0.75), prefrontal_cortex:active_goal (0.61)
+COMPOSITIONAL> CGE00001 status=PASS train=32/32 holdout=16/16 mismatches=0
+CATATAN> interaksi motif graf sintetis dibandingkan oracle internal; bukan verifikasi kebenaran eksternal; perbaikan otomatis tidak dilakukan.
+COGNITIVE_UPDATE> siklus=1; WORKSPACE> compositional_lab:compositional_graph_interaction_report (0.75), prefrontal_cortex:active_goal (0.61)
 
-KAMU> /failure-guided-report
+KAMU> /compositional-report
 {
   "run_count": 1,
   "latest": {
-    "suite_version": "failure-guided-discovery-sealed-holdout-v1",
-    "seed": 16001,
-    "training_seed": 16001,
-    "holdout_seed": 5908802,
-    "recorded_at": "2026-10-23T03:56:45.216205+00:00",
+    "suite_version": "compositional-graph-interaction-sealed-holdout-v1",
+    "seed": 17001,
+    "training_seed": 17001,
+    "holdout_seed": 5004238,
+    "recorded_at": "2026-10-23T04:22:49.477415+00:00",
     "training": {
-      "case_count": 40,
-      "matched": 40,
+      "case_count": 32,
+      "matched": 32,
       "mismatches": 0,
       "match_rate": 1.0,
       "all_matched": true,
-      "family_summary": {
-        "target_conflict": {
+      "composition_summary": {
+        "direct_plus_disconnected_conflict_cycle": {
           "cases": 4,
           "matches": 4,
           "mismatches": 0
         },
-        "path_conflict": {
+        "chain_plus_route_self_loop": {
           "cases": 4,
           "matches": 4,
           "mismatches": 0
         },
-        "deep_path": {
+        "target_conflict_plus_alternate_route": {
           "cases": 4,
           "matches": 4,
           "mismatches": 0
         },
-        "normalization": {
+        "alternate_route_with_conflicted_branch": {
           "cases": 4,
           "matches": 4,
           "mismatches": 0
         },
-        "alternate_routes": {
+        "deep_bridge_conflict_plus_cycle_noise": {
           "cases": 4,
           "matches": 4,
           "mismatches": 0
         },
-        "cycle_route": {
+        "duplicate_prefix_plus_predicate_decoy": {
           "cases": 4,
           "matches": 4,
           "mismatches": 0
         },
-        "unsupported_decoy": {
+        "cycle_touching_route_plus_clean_bridge": {
           "cases": 4,
           "matches": 4,
           "mismatches": 0
         },
-        "duplicate_edge": {
-          "cases": 4,
-          "matches": 4,
-          "mismatches": 0
-        },
-        "self_loop": {
-          "cases": 4,
-          "matches": 4,
-          "mismatches": 0
-        },
-        "irrelevant_conflict": {
+        "unsupported_query_plus_disconnected_negative_cycle": {
           "cases": 4,
           "matches": 4,
           "mismatches": 0
@@ -521,62 +498,14 @@ KAMU> /failure-guided-report
       },
       "cases": [
         {
-          "case_id": "TR0001",
-          "split": "discovery_train",
-          "family": "target_conflict",
-          "fact_count": 3,
+          "case_id": "TRC0001",
+          "split": "composition_train",
+          "composition": "direct_plus_disconnected_conflict_cycle",
+          "fact_count": 5,
           "query": [
-            "fgtr16001_001_s",
+            "cgtr17001_001_s",
             "is_a",
-            "fgtr16001_001_o"
-          ],
-          "expected_status": "conflicted",
-          "observed_status": "conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0002",
-          "split": "discovery_train",
-          "family": "path_conflict",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_002_s",
-            "is_a",
-            "fgtr16001_002_o"
-          ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0003",
-          "split": "discovery_train",
-          "family": "deep_path",
-          "fact_count": 8,
-          "query": [
-            "fgtr16001_003_s",
-            "is_a",
-            "fgtr16001_003_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0004",
-          "split": "discovery_train",
-          "family": "normalization",
-          "fact_count": 2,
-          "query": [
-            "fgtr16001_004_s",
-            "is_a",
-            "fgtr16001_004_o"
+            "cgtr17001_001_o"
           ],
           "expected_status": "direct_assertion_unverified",
           "observed_status": "direct_assertion_unverified",
@@ -585,126 +514,62 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0005",
-          "split": "discovery_train",
-          "family": "alternate_routes",
-          "fact_count": 6,
+          "case_id": "TRC0002",
+          "split": "composition_train",
+          "composition": "chain_plus_route_self_loop",
+          "fact_count": 4,
           "query": [
-            "fgtr16001_005_s",
+            "cgtr17001_002_s",
             "is_a",
-            "fgtr16001_005_o"
+            "cgtr17001_002_o"
           ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0003",
+          "split": "composition_train",
+          "composition": "target_conflict_plus_alternate_route",
+          "fact_count": 5,
+          "query": [
+            "cgtr17001_003_s",
+            "is_a",
+            "cgtr17001_003_o"
+          ],
+          "expected_status": "conflicted",
+          "observed_status": "conflicted",
           "expected_path_count": 2,
           "observed_path_count": 2,
           "match": true
         },
         {
-          "case_id": "TR0006",
-          "split": "discovery_train",
-          "family": "cycle_route",
+          "case_id": "TRC0004",
+          "split": "composition_train",
+          "composition": "alternate_route_with_conflicted_branch",
           "fact_count": 7,
           "query": [
-            "fgtr16001_006_s",
+            "cgtr17001_004_s",
             "is_a",
-            "fgtr16001_006_o"
+            "cgtr17001_004_o"
           ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
+          "expected_status": "inference_path_conflicted",
+          "observed_status": "inference_path_conflicted",
+          "expected_path_count": 2,
+          "observed_path_count": 2,
           "match": true
         },
         {
-          "case_id": "TR0007",
-          "split": "discovery_train",
-          "family": "unsupported_decoy",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_007_s",
-            "is_a",
-            "fgtr16001_007_o"
-          ],
-          "expected_status": "no_support_found_in_stored_memory",
-          "observed_status": "no_support_found_in_stored_memory",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "TR0008",
-          "split": "discovery_train",
-          "family": "duplicate_edge",
-          "fact_count": 5,
-          "query": [
-            "fgtr16001_008_s",
-            "is_a",
-            "fgtr16001_008_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0009",
-          "split": "discovery_train",
-          "family": "self_loop",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_009_s",
-            "is_a",
-            "fgtr16001_009_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0010",
-          "split": "discovery_train",
-          "family": "irrelevant_conflict",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_010_s",
-            "is_a",
-            "fgtr16001_010_o"
-          ],
-          "expected_status": "direct_assertion_unverified",
-          "observed_status": "direct_assertion_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0011",
-          "split": "discovery_train",
-          "family": "target_conflict",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_011_s",
-            "is_a",
-            "fgtr16001_011_o"
-          ],
-          "expected_status": "conflicted",
-          "observed_status": "conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0012",
-          "split": "discovery_train",
-          "family": "path_conflict",
+          "case_id": "TRC0005",
+          "split": "composition_train",
+          "composition": "deep_bridge_conflict_plus_cycle_noise",
           "fact_count": 7,
           "query": [
-            "fgtr16001_012_s",
+            "cgtr17001_005_s",
             "is_a",
-            "fgtr16001_012_o"
+            "cgtr17001_005_o"
           ],
           "expected_status": "inference_path_conflicted",
           "observed_status": "inference_path_conflicted",
@@ -713,14 +578,14 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0013",
-          "split": "discovery_train",
-          "family": "deep_path",
+          "case_id": "TRC0006",
+          "split": "composition_train",
+          "composition": "duplicate_prefix_plus_predicate_decoy",
           "fact_count": 6,
           "query": [
-            "fgtr16001_013_s",
+            "cgtr17001_006_s",
             "is_a",
-            "fgtr16001_013_o"
+            "cgtr17001_006_o"
           ],
           "expected_status": "inference_path_unverified",
           "observed_status": "inference_path_unverified",
@@ -729,46 +594,14 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0014",
-          "split": "discovery_train",
-          "family": "normalization",
-          "fact_count": 1,
-          "query": [
-            "fgtr16001_014_s",
-            "is_a",
-            "fgtr16001_014_o"
-          ],
-          "expected_status": "direct_assertion_unverified",
-          "observed_status": "direct_assertion_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0015",
-          "split": "discovery_train",
-          "family": "alternate_routes",
-          "fact_count": 6,
-          "query": [
-            "fgtr16001_015_s",
-            "is_a",
-            "fgtr16001_015_o"
-          ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
-          "expected_path_count": 2,
-          "observed_path_count": 2,
-          "match": true
-        },
-        {
-          "case_id": "TR0016",
-          "split": "discovery_train",
-          "family": "cycle_route",
+          "case_id": "TRC0007",
+          "split": "composition_train",
+          "composition": "cycle_touching_route_plus_clean_bridge",
           "fact_count": 5,
           "query": [
-            "fgtr16001_016_s",
+            "cgtr17001_007_s",
             "is_a",
-            "fgtr16001_016_o"
+            "cgtr17001_007_o"
           ],
           "expected_status": "inference_path_unverified",
           "observed_status": "inference_path_unverified",
@@ -777,14 +610,14 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0017",
-          "split": "discovery_train",
-          "family": "unsupported_decoy",
-          "fact_count": 3,
+          "case_id": "TRC0008",
+          "split": "composition_train",
+          "composition": "unsupported_query_plus_disconnected_negative_cycle",
+          "fact_count": 7,
           "query": [
-            "fgtr16001_017_s",
+            "cgtr17001_008_s",
             "is_a",
-            "fgtr16001_017_o"
+            "cgtr17001_008_o"
           ],
           "expected_status": "no_support_found_in_stored_memory",
           "observed_status": "no_support_found_in_stored_memory",
@@ -793,46 +626,14 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0018",
-          "split": "discovery_train",
-          "family": "duplicate_edge",
-          "fact_count": 4,
+          "case_id": "TRC0009",
+          "split": "composition_train",
+          "composition": "direct_plus_disconnected_conflict_cycle",
+          "fact_count": 5,
           "query": [
-            "fgtr16001_018_s",
+            "cgtr17001_009_s",
             "is_a",
-            "fgtr16001_018_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0019",
-          "split": "discovery_train",
-          "family": "self_loop",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_019_s",
-            "is_a",
-            "fgtr16001_019_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0020",
-          "split": "discovery_train",
-          "family": "irrelevant_conflict",
-          "fact_count": 4,
-          "query": [
-            "fgtr16001_020_s",
-            "is_a",
-            "fgtr16001_020_o"
+            "cgtr17001_009_o"
           ],
           "expected_status": "direct_assertion_unverified",
           "observed_status": "direct_assertion_unverified",
@@ -841,78 +642,46 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0021",
-          "split": "discovery_train",
-          "family": "target_conflict",
-          "fact_count": 6,
+          "case_id": "TRC0010",
+          "split": "composition_train",
+          "composition": "chain_plus_route_self_loop",
+          "fact_count": 4,
           "query": [
-            "fgtr16001_021_s",
+            "cgtr17001_010_s",
             "is_a",
-            "fgtr16001_021_o"
+            "cgtr17001_010_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0011",
+          "split": "composition_train",
+          "composition": "target_conflict_plus_alternate_route",
+          "fact_count": 5,
+          "query": [
+            "cgtr17001_011_s",
+            "is_a",
+            "cgtr17001_011_o"
           ],
           "expected_status": "conflicted",
           "observed_status": "conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
+          "expected_path_count": 2,
+          "observed_path_count": 2,
           "match": true
         },
         {
-          "case_id": "TR0022",
-          "split": "discovery_train",
-          "family": "path_conflict",
-          "fact_count": 3,
+          "case_id": "TRC0012",
+          "split": "composition_train",
+          "composition": "alternate_route_with_conflicted_branch",
+          "fact_count": 7,
           "query": [
-            "fgtr16001_022_s",
+            "cgtr17001_012_s",
             "is_a",
-            "fgtr16001_022_o"
-          ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0023",
-          "split": "discovery_train",
-          "family": "deep_path",
-          "fact_count": 6,
-          "query": [
-            "fgtr16001_023_s",
-            "is_a",
-            "fgtr16001_023_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0024",
-          "split": "discovery_train",
-          "family": "normalization",
-          "fact_count": 5,
-          "query": [
-            "fgtr16001_024_s",
-            "is_a",
-            "fgtr16001_024_o"
-          ],
-          "expected_status": "direct_assertion_unverified",
-          "observed_status": "direct_assertion_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0025",
-          "split": "discovery_train",
-          "family": "alternate_routes",
-          "fact_count": 6,
-          "query": [
-            "fgtr16001_025_s",
-            "is_a",
-            "fgtr16001_025_o"
+            "cgtr17001_012_o"
           ],
           "expected_status": "inference_path_conflicted",
           "observed_status": "inference_path_conflicted",
@@ -921,14 +690,30 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0026",
-          "split": "discovery_train",
-          "family": "cycle_route",
-          "fact_count": 4,
+          "case_id": "TRC0013",
+          "split": "composition_train",
+          "composition": "deep_bridge_conflict_plus_cycle_noise",
+          "fact_count": 7,
           "query": [
-            "fgtr16001_026_s",
+            "cgtr17001_013_s",
             "is_a",
-            "fgtr16001_026_o"
+            "cgtr17001_013_o"
+          ],
+          "expected_status": "inference_path_conflicted",
+          "observed_status": "inference_path_conflicted",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0014",
+          "split": "composition_train",
+          "composition": "duplicate_prefix_plus_predicate_decoy",
+          "fact_count": 6,
+          "query": [
+            "cgtr17001_014_s",
+            "is_a",
+            "cgtr17001_014_o"
           ],
           "expected_status": "inference_path_unverified",
           "observed_status": "inference_path_unverified",
@@ -937,14 +722,30 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0027",
-          "split": "discovery_train",
-          "family": "unsupported_decoy",
-          "fact_count": 3,
+          "case_id": "TRC0015",
+          "split": "composition_train",
+          "composition": "cycle_touching_route_plus_clean_bridge",
+          "fact_count": 5,
           "query": [
-            "fgtr16001_027_s",
+            "cgtr17001_015_s",
             "is_a",
-            "fgtr16001_027_o"
+            "cgtr17001_015_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0016",
+          "split": "composition_train",
+          "composition": "unsupported_query_plus_disconnected_negative_cycle",
+          "fact_count": 7,
+          "query": [
+            "cgtr17001_016_s",
+            "is_a",
+            "cgtr17001_016_o"
           ],
           "expected_status": "no_support_found_in_stored_memory",
           "observed_status": "no_support_found_in_stored_memory",
@@ -953,46 +754,14 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0028",
-          "split": "discovery_train",
-          "family": "duplicate_edge",
+          "case_id": "TRC0017",
+          "split": "composition_train",
+          "composition": "direct_plus_disconnected_conflict_cycle",
           "fact_count": 5,
           "query": [
-            "fgtr16001_028_s",
+            "cgtr17001_017_s",
             "is_a",
-            "fgtr16001_028_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0029",
-          "split": "discovery_train",
-          "family": "self_loop",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_029_s",
-            "is_a",
-            "fgtr16001_029_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0030",
-          "split": "discovery_train",
-          "family": "irrelevant_conflict",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_030_s",
-            "is_a",
-            "fgtr16001_030_o"
+            "cgtr17001_017_o"
           ],
           "expected_status": "direct_assertion_unverified",
           "observed_status": "direct_assertion_unverified",
@@ -1001,78 +770,46 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0031",
-          "split": "discovery_train",
-          "family": "target_conflict",
-          "fact_count": 3,
+          "case_id": "TRC0018",
+          "split": "composition_train",
+          "composition": "chain_plus_route_self_loop",
+          "fact_count": 4,
           "query": [
-            "fgtr16001_031_s",
+            "cgtr17001_018_s",
             "is_a",
-            "fgtr16001_031_o"
+            "cgtr17001_018_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0019",
+          "split": "composition_train",
+          "composition": "target_conflict_plus_alternate_route",
+          "fact_count": 5,
+          "query": [
+            "cgtr17001_019_s",
+            "is_a",
+            "cgtr17001_019_o"
           ],
           "expected_status": "conflicted",
           "observed_status": "conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
+          "expected_path_count": 2,
+          "observed_path_count": 2,
           "match": true
         },
         {
-          "case_id": "TR0032",
-          "split": "discovery_train",
-          "family": "path_conflict",
-          "fact_count": 4,
+          "case_id": "TRC0020",
+          "split": "composition_train",
+          "composition": "alternate_route_with_conflicted_branch",
+          "fact_count": 7,
           "query": [
-            "fgtr16001_032_s",
+            "cgtr17001_020_s",
             "is_a",
-            "fgtr16001_032_o"
-          ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0033",
-          "split": "discovery_train",
-          "family": "deep_path",
-          "fact_count": 6,
-          "query": [
-            "fgtr16001_033_s",
-            "is_a",
-            "fgtr16001_033_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0034",
-          "split": "discovery_train",
-          "family": "normalization",
-          "fact_count": 1,
-          "query": [
-            "fgtr16001_034_s",
-            "is_a",
-            "fgtr16001_034_o"
-          ],
-          "expected_status": "direct_assertion_unverified",
-          "observed_status": "direct_assertion_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0035",
-          "split": "discovery_train",
-          "family": "alternate_routes",
-          "fact_count": 6,
-          "query": [
-            "fgtr16001_035_s",
-            "is_a",
-            "fgtr16001_035_o"
+            "cgtr17001_020_o"
           ],
           "expected_status": "inference_path_conflicted",
           "observed_status": "inference_path_conflicted",
@@ -1081,14 +818,30 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0036",
-          "split": "discovery_train",
-          "family": "cycle_route",
-          "fact_count": 8,
+          "case_id": "TRC0021",
+          "split": "composition_train",
+          "composition": "deep_bridge_conflict_plus_cycle_noise",
+          "fact_count": 7,
           "query": [
-            "fgtr16001_036_s",
+            "cgtr17001_021_s",
             "is_a",
-            "fgtr16001_036_o"
+            "cgtr17001_021_o"
+          ],
+          "expected_status": "inference_path_conflicted",
+          "observed_status": "inference_path_conflicted",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0022",
+          "split": "composition_train",
+          "composition": "duplicate_prefix_plus_predicate_decoy",
+          "fact_count": 6,
+          "query": [
+            "cgtr17001_022_s",
+            "is_a",
+            "cgtr17001_022_o"
           ],
           "expected_status": "inference_path_unverified",
           "observed_status": "inference_path_unverified",
@@ -1097,14 +850,30 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0037",
-          "split": "discovery_train",
-          "family": "unsupported_decoy",
-          "fact_count": 3,
+          "case_id": "TRC0023",
+          "split": "composition_train",
+          "composition": "cycle_touching_route_plus_clean_bridge",
+          "fact_count": 5,
           "query": [
-            "fgtr16001_037_s",
+            "cgtr17001_023_s",
             "is_a",
-            "fgtr16001_037_o"
+            "cgtr17001_023_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0024",
+          "split": "composition_train",
+          "composition": "unsupported_query_plus_disconnected_negative_cycle",
+          "fact_count": 7,
+          "query": [
+            "cgtr17001_024_s",
+            "is_a",
+            "cgtr17001_024_o"
           ],
           "expected_status": "no_support_found_in_stored_memory",
           "observed_status": "no_support_found_in_stored_memory",
@@ -1113,109 +882,179 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "TR0038",
-          "split": "discovery_train",
-          "family": "duplicate_edge",
-          "fact_count": 4,
+          "case_id": "TRC0025",
+          "split": "composition_train",
+          "composition": "direct_plus_disconnected_conflict_cycle",
+          "fact_count": 5,
           "query": [
-            "fgtr16001_038_s",
+            "cgtr17001_025_s",
             "is_a",
-            "fgtr16001_038_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0039",
-          "split": "discovery_train",
-          "family": "self_loop",
-          "fact_count": 3,
-          "query": [
-            "fgtr16001_039_s",
-            "is_a",
-            "fgtr16001_039_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "TR0040",
-          "split": "discovery_train",
-          "family": "irrelevant_conflict",
-          "fact_count": 4,
-          "query": [
-            "fgtr16001_040_s",
-            "is_a",
-            "fgtr16001_040_o"
+            "cgtr17001_025_o"
           ],
           "expected_status": "direct_assertion_unverified",
           "observed_status": "direct_assertion_unverified",
           "expected_path_count": 1,
           "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0026",
+          "split": "composition_train",
+          "composition": "chain_plus_route_self_loop",
+          "fact_count": 4,
+          "query": [
+            "cgtr17001_026_s",
+            "is_a",
+            "cgtr17001_026_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0027",
+          "split": "composition_train",
+          "composition": "target_conflict_plus_alternate_route",
+          "fact_count": 5,
+          "query": [
+            "cgtr17001_027_s",
+            "is_a",
+            "cgtr17001_027_o"
+          ],
+          "expected_status": "conflicted",
+          "observed_status": "conflicted",
+          "expected_path_count": 2,
+          "observed_path_count": 2,
+          "match": true
+        },
+        {
+          "case_id": "TRC0028",
+          "split": "composition_train",
+          "composition": "alternate_route_with_conflicted_branch",
+          "fact_count": 7,
+          "query": [
+            "cgtr17001_028_s",
+            "is_a",
+            "cgtr17001_028_o"
+          ],
+          "expected_status": "inference_path_conflicted",
+          "observed_status": "inference_path_conflicted",
+          "expected_path_count": 2,
+          "observed_path_count": 2,
+          "match": true
+        },
+        {
+          "case_id": "TRC0029",
+          "split": "composition_train",
+          "composition": "deep_bridge_conflict_plus_cycle_noise",
+          "fact_count": 7,
+          "query": [
+            "cgtr17001_029_s",
+            "is_a",
+            "cgtr17001_029_o"
+          ],
+          "expected_status": "inference_path_conflicted",
+          "observed_status": "inference_path_conflicted",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0030",
+          "split": "composition_train",
+          "composition": "duplicate_prefix_plus_predicate_decoy",
+          "fact_count": 6,
+          "query": [
+            "cgtr17001_030_s",
+            "is_a",
+            "cgtr17001_030_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0031",
+          "split": "composition_train",
+          "composition": "cycle_touching_route_plus_clean_bridge",
+          "fact_count": 5,
+          "query": [
+            "cgtr17001_031_s",
+            "is_a",
+            "cgtr17001_031_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "TRC0032",
+          "split": "composition_train",
+          "composition": "unsupported_query_plus_disconnected_negative_cycle",
+          "fact_count": 7,
+          "query": [
+            "cgtr17001_032_s",
+            "is_a",
+            "cgtr17001_032_o"
+          ],
+          "expected_status": "no_support_found_in_stored_memory",
+          "observed_status": "no_support_found_in_stored_memory",
+          "expected_path_count": 0,
+          "observed_path_count": 0,
           "match": true
         }
       ],
       "minimized_counterexamples": []
     },
     "holdout": {
-      "case_count": 20,
-      "matched": 20,
+      "case_count": 16,
+      "matched": 16,
       "mismatches": 0,
       "match_rate": 1.0,
       "all_matched": true,
-      "family_summary": {
-        "three_route_mixed_conflict": {
+      "composition_summary": {
+        "direct_plus_conflicted_alternate_path": {
           "cases": 2,
           "matches": 2,
           "mismatches": 0
         },
-        "cycle_after_target": {
+        "long_route_plus_two_cycles": {
           "cases": 2,
           "matches": 2,
           "mismatches": 0
         },
-        "same_node_negative": {
+        "target_negative_plus_three_routes": {
           "cases": 2,
           "matches": 2,
           "mismatches": 0
         },
-        "disconnected_cycle_only": {
+        "clean_alternate_routes_plus_disconnected_conflict": {
           "cases": 2,
           "matches": 2,
           "mismatches": 0
         },
-        "normalized_opposing_assertions": {
+        "clean_path_plus_reverse_cycle_decoy": {
           "cases": 2,
           "matches": 2,
           "mismatches": 0
         },
-        "reverse_chain_only": {
+        "positive_self_loop_plus_disconnected_cycle": {
           "cases": 2,
           "matches": 2,
           "mismatches": 0
         },
-        "deep_bridge_conflict": {
+        "same_node_negative_plus_positive_cycle": {
           "cases": 2,
           "matches": 2,
           "mismatches": 0
         },
-        "relation_decoy_chain": {
-          "cases": 2,
-          "matches": 2,
-          "mismatches": 0
-        },
-        "positive_self_loop_only": {
-          "cases": 2,
-          "matches": 2,
-          "mismatches": 0
-        },
-        "cycle_near_target": {
+        "unsupported_query_plus_duplicate_predicate_decoys": {
           "cases": 2,
           "matches": 2,
           "mismatches": 0
@@ -1223,30 +1062,30 @@ KAMU> /failure-guided-report
       },
       "cases": [
         {
-          "case_id": "HO0001",
+          "case_id": "HOC0001",
           "split": "sealed_holdout",
-          "family": "three_route_mixed_conflict",
-          "fact_count": 8,
-          "query": [
-            "fgho08802_001_s",
-            "is_a",
-            "fgho08802_001_o"
-          ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
-          "expected_path_count": 3,
-          "observed_path_count": 3,
-          "match": true
-        },
-        {
-          "case_id": "HO0002",
-          "split": "sealed_holdout",
-          "family": "cycle_after_target",
+          "composition": "direct_plus_conflicted_alternate_path",
           "fact_count": 5,
           "query": [
-            "fgho08802_002_s",
+            "cgho04238_001_s",
             "is_a",
-            "fgho08802_002_o"
+            "cgho04238_001_o"
+          ],
+          "expected_status": "direct_assertion_unverified_with_conflicted_path",
+          "observed_status": "direct_assertion_unverified_with_conflicted_path",
+          "expected_path_count": 2,
+          "observed_path_count": 2,
+          "match": true
+        },
+        {
+          "case_id": "HOC0002",
+          "split": "sealed_holdout",
+          "composition": "long_route_plus_two_cycles",
+          "fact_count": 10,
+          "query": [
+            "cgho04238_002_s",
+            "is_a",
+            "cgho04238_002_o"
           ],
           "expected_status": "inference_path_unverified",
           "observed_status": "inference_path_unverified",
@@ -1255,158 +1094,46 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "HO0003",
+          "case_id": "HOC0003",
           "split": "sealed_holdout",
-          "family": "same_node_negative",
-          "fact_count": 1,
+          "composition": "target_negative_plus_three_routes",
+          "fact_count": 8,
           "query": [
-            "fgho08802_003_same",
+            "cgho04238_003_s",
             "is_a",
-            "fgho08802_003_same"
+            "cgho04238_003_o"
           ],
           "expected_status": "conflicted",
           "observed_status": "conflicted",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0004",
-          "split": "sealed_holdout",
-          "family": "disconnected_cycle_only",
-          "fact_count": 8,
-          "query": [
-            "fgho08802_004_s",
-            "is_a",
-            "fgho08802_004_o"
-          ],
-          "expected_status": "no_support_found_in_stored_memory",
-          "observed_status": "no_support_found_in_stored_memory",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0005",
-          "split": "sealed_holdout",
-          "family": "normalized_opposing_assertions",
-          "fact_count": 3,
-          "query": [
-            "fgho08802_005_s",
-            "is_a",
-            "fgho08802_005_o"
-          ],
-          "expected_status": "conflicted",
-          "observed_status": "conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "HO0006",
-          "split": "sealed_holdout",
-          "family": "reverse_chain_only",
-          "fact_count": 3,
-          "query": [
-            "fgho08802_006_s",
-            "is_a",
-            "fgho08802_006_o"
-          ],
-          "expected_status": "no_support_found_in_stored_memory",
-          "observed_status": "no_support_found_in_stored_memory",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0007",
-          "split": "sealed_holdout",
-          "family": "deep_bridge_conflict",
-          "fact_count": 6,
-          "query": [
-            "fgho08802_007_s",
-            "is_a",
-            "fgho08802_007_o"
-          ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "HO0008",
-          "split": "sealed_holdout",
-          "family": "relation_decoy_chain",
-          "fact_count": 4,
-          "query": [
-            "fgho08802_008_s",
-            "is_a",
-            "fgho08802_008_o"
-          ],
-          "expected_status": "no_support_found_in_stored_memory",
-          "observed_status": "no_support_found_in_stored_memory",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0009",
-          "split": "sealed_holdout",
-          "family": "positive_self_loop_only",
-          "fact_count": 1,
-          "query": [
-            "fgho08802_009_same",
-            "is_a",
-            "fgho08802_009_same"
-          ],
-          "expected_status": "direct_assertion_unverified",
-          "observed_status": "direct_assertion_unverified",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0010",
-          "split": "sealed_holdout",
-          "family": "cycle_near_target",
-          "fact_count": 7,
-          "query": [
-            "fgho08802_010_s",
-            "is_a",
-            "fgho08802_010_o"
-          ],
-          "expected_status": "inference_path_unverified",
-          "observed_status": "inference_path_unverified",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "HO0011",
-          "split": "sealed_holdout",
-          "family": "three_route_mixed_conflict",
-          "fact_count": 8,
-          "query": [
-            "fgho08802_011_s",
-            "is_a",
-            "fgho08802_011_o"
-          ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
           "expected_path_count": 3,
           "observed_path_count": 3,
           "match": true
         },
         {
-          "case_id": "HO0012",
+          "case_id": "HOC0004",
           "split": "sealed_holdout",
-          "family": "cycle_after_target",
+          "composition": "clean_alternate_routes_plus_disconnected_conflict",
           "fact_count": 7,
           "query": [
-            "fgho08802_012_s",
+            "cgho04238_004_s",
             "is_a",
-            "fgho08802_012_o"
+            "cgho04238_004_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 2,
+          "observed_path_count": 2,
+          "match": true
+        },
+        {
+          "case_id": "HOC0005",
+          "split": "sealed_holdout",
+          "composition": "clean_path_plus_reverse_cycle_decoy",
+          "fact_count": 7,
+          "query": [
+            "cgho04238_005_s",
+            "is_a",
+            "cgho04238_005_o"
           ],
           "expected_status": "inference_path_unverified",
           "observed_status": "inference_path_unverified",
@@ -1415,110 +1142,14 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "HO0013",
+          "case_id": "HOC0006",
           "split": "sealed_holdout",
-          "family": "same_node_negative",
-          "fact_count": 1,
-          "query": [
-            "fgho08802_013_same",
-            "is_a",
-            "fgho08802_013_same"
-          ],
-          "expected_status": "conflicted",
-          "observed_status": "conflicted",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0014",
-          "split": "sealed_holdout",
-          "family": "disconnected_cycle_only",
+          "composition": "positive_self_loop_plus_disconnected_cycle",
           "fact_count": 4,
           "query": [
-            "fgho08802_014_s",
+            "cgho04238_006_same",
             "is_a",
-            "fgho08802_014_o"
-          ],
-          "expected_status": "no_support_found_in_stored_memory",
-          "observed_status": "no_support_found_in_stored_memory",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0015",
-          "split": "sealed_holdout",
-          "family": "normalized_opposing_assertions",
-          "fact_count": 3,
-          "query": [
-            "fgho08802_015_s",
-            "is_a",
-            "fgho08802_015_o"
-          ],
-          "expected_status": "conflicted",
-          "observed_status": "conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "HO0016",
-          "split": "sealed_holdout",
-          "family": "reverse_chain_only",
-          "fact_count": 6,
-          "query": [
-            "fgho08802_016_s",
-            "is_a",
-            "fgho08802_016_o"
-          ],
-          "expected_status": "no_support_found_in_stored_memory",
-          "observed_status": "no_support_found_in_stored_memory",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0017",
-          "split": "sealed_holdout",
-          "family": "deep_bridge_conflict",
-          "fact_count": 6,
-          "query": [
-            "fgho08802_017_s",
-            "is_a",
-            "fgho08802_017_o"
-          ],
-          "expected_status": "inference_path_conflicted",
-          "observed_status": "inference_path_conflicted",
-          "expected_path_count": 1,
-          "observed_path_count": 1,
-          "match": true
-        },
-        {
-          "case_id": "HO0018",
-          "split": "sealed_holdout",
-          "family": "relation_decoy_chain",
-          "fact_count": 4,
-          "query": [
-            "fgho08802_018_s",
-            "is_a",
-            "fgho08802_018_o"
-          ],
-          "expected_status": "no_support_found_in_stored_memory",
-          "observed_status": "no_support_found_in_stored_memory",
-          "expected_path_count": 0,
-          "observed_path_count": 0,
-          "match": true
-        },
-        {
-          "case_id": "HO0019",
-          "split": "sealed_holdout",
-          "family": "positive_self_loop_only",
-          "fact_count": 1,
-          "query": [
-            "fgho08802_019_same",
-            "is_a",
-            "fgho08802_019_same"
+            "cgho04238_006_same"
           ],
           "expected_status": "direct_assertion_unverified",
           "observed_status": "direct_assertion_unverified",
@@ -1527,74 +1158,210 @@ KAMU> /failure-guided-report
           "match": true
         },
         {
-          "case_id": "HO0020",
+          "case_id": "HOC0007",
           "split": "sealed_holdout",
-          "family": "cycle_near_target",
-          "fact_count": 10,
+          "composition": "same_node_negative_plus_positive_cycle",
+          "fact_count": 4,
           "query": [
-            "fgho08802_020_s",
+            "cgho04238_007_same",
             "is_a",
-            "fgho08802_020_o"
+            "cgho04238_007_same"
+          ],
+          "expected_status": "conflicted",
+          "observed_status": "conflicted",
+          "expected_path_count": 0,
+          "observed_path_count": 0,
+          "match": true
+        },
+        {
+          "case_id": "HOC0008",
+          "split": "sealed_holdout",
+          "composition": "unsupported_query_plus_duplicate_predicate_decoys",
+          "fact_count": 6,
+          "query": [
+            "cgho04238_008_s",
+            "is_a",
+            "cgho04238_008_o"
+          ],
+          "expected_status": "no_support_found_in_stored_memory",
+          "observed_status": "no_support_found_in_stored_memory",
+          "expected_path_count": 0,
+          "observed_path_count": 0,
+          "match": true
+        },
+        {
+          "case_id": "HOC0009",
+          "split": "sealed_holdout",
+          "composition": "direct_plus_conflicted_alternate_path",
+          "fact_count": 5,
+          "query": [
+            "cgho04238_009_s",
+            "is_a",
+            "cgho04238_009_o"
+          ],
+          "expected_status": "direct_assertion_unverified_with_conflicted_path",
+          "observed_status": "direct_assertion_unverified_with_conflicted_path",
+          "expected_path_count": 2,
+          "observed_path_count": 2,
+          "match": true
+        },
+        {
+          "case_id": "HOC0010",
+          "split": "sealed_holdout",
+          "composition": "long_route_plus_two_cycles",
+          "fact_count": 11,
+          "query": [
+            "cgho04238_010_s",
+            "is_a",
+            "cgho04238_010_o"
           ],
           "expected_status": "inference_path_unverified",
           "observed_status": "inference_path_unverified",
           "expected_path_count": 1,
           "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "HOC0011",
+          "split": "sealed_holdout",
+          "composition": "target_negative_plus_three_routes",
+          "fact_count": 8,
+          "query": [
+            "cgho04238_011_s",
+            "is_a",
+            "cgho04238_011_o"
+          ],
+          "expected_status": "conflicted",
+          "observed_status": "conflicted",
+          "expected_path_count": 3,
+          "observed_path_count": 3,
+          "match": true
+        },
+        {
+          "case_id": "HOC0012",
+          "split": "sealed_holdout",
+          "composition": "clean_alternate_routes_plus_disconnected_conflict",
+          "fact_count": 7,
+          "query": [
+            "cgho04238_012_s",
+            "is_a",
+            "cgho04238_012_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 2,
+          "observed_path_count": 2,
+          "match": true
+        },
+        {
+          "case_id": "HOC0013",
+          "split": "sealed_holdout",
+          "composition": "clean_path_plus_reverse_cycle_decoy",
+          "fact_count": 6,
+          "query": [
+            "cgho04238_013_s",
+            "is_a",
+            "cgho04238_013_o"
+          ],
+          "expected_status": "inference_path_unverified",
+          "observed_status": "inference_path_unverified",
+          "expected_path_count": 1,
+          "observed_path_count": 1,
+          "match": true
+        },
+        {
+          "case_id": "HOC0014",
+          "split": "sealed_holdout",
+          "composition": "positive_self_loop_plus_disconnected_cycle",
+          "fact_count": 4,
+          "query": [
+            "cgho04238_014_same",
+            "is_a",
+            "cgho04238_014_same"
+          ],
+          "expected_status": "direct_assertion_unverified",
+          "observed_status": "direct_assertion_unverified",
+          "expected_path_count": 0,
+          "observed_path_count": 0,
+          "match": true
+        },
+        {
+          "case_id": "HOC0015",
+          "split": "sealed_holdout",
+          "composition": "same_node_negative_plus_positive_cycle",
+          "fact_count": 5,
+          "query": [
+            "cgho04238_015_same",
+            "is_a",
+            "cgho04238_015_same"
+          ],
+          "expected_status": "conflicted",
+          "observed_status": "conflicted",
+          "expected_path_count": 0,
+          "observed_path_count": 0,
+          "match": true
+        },
+        {
+          "case_id": "HOC0016",
+          "split": "sealed_holdout",
+          "composition": "unsupported_query_plus_duplicate_predicate_decoys",
+          "fact_count": 6,
+          "query": [
+            "cgho04238_016_s",
+            "is_a",
+            "cgho04238_016_o"
+          ],
+          "expected_status": "no_support_found_in_stored_memory",
+          "observed_status": "no_support_found_in_stored_memory",
+          "expected_path_count": 0,
+          "observed_path_count": 0,
           "match": true
         }
       ],
       "minimized_counterexamples": []
     },
-    "training_case_count": 40,
-    "holdout_case_count": 20,
-    "case_count": 60,
-    "matched": 60,
+    "training_case_count": 32,
+    "holdout_case_count": 16,
+    "case_count": 48,
+    "matched": 48,
     "mismatches": 0,
     "oracle_match_rate": 1.0,
     "all_matched": true,
-    "training_pattern_priority": [
+    "training_composition_priority": [
       {
-        "family": "target_conflict",
+        "composition": "direct_plus_disconnected_conflict_cycle",
         "historical_signal_score": 0
       },
       {
-        "family": "path_conflict",
+        "composition": "chain_plus_route_self_loop",
         "historical_signal_score": 0
       },
       {
-        "family": "deep_path",
+        "composition": "target_conflict_plus_alternate_route",
         "historical_signal_score": 0
       },
       {
-        "family": "normalization",
+        "composition": "alternate_route_with_conflicted_branch",
         "historical_signal_score": 0
       },
       {
-        "family": "alternate_routes",
+        "composition": "deep_bridge_conflict_plus_cycle_noise",
         "historical_signal_score": 0
       },
       {
-        "family": "cycle_route",
+        "composition": "duplicate_prefix_plus_predicate_decoy",
         "historical_signal_score": 0
       },
       {
-        "family": "unsupported_decoy",
+        "composition": "cycle_touching_route_plus_clean_bridge",
         "historical_signal_score": 0
       },
       {
-        "family": "duplicate_edge",
-        "historical_signal_score": 0
-      },
-      {
-        "family": "self_loop",
-        "historical_signal_score": 0
-      },
-      {
-        "family": "irrelevant_conflict",
+        "composition": "unsupported_query_plus_disconnected_negative_cycle",
         "historical_signal_score": 0
       }
     ],
-    "priority_basis": "coverage_priority_fallback_no_historical_mismatch",
+    "priority_basis": "coverage_fallback_no_historical_training_mismatch",
     "historical_failure_signal_count": 0,
     "mismatch_review_queue": [],
     "isolation_invariants": {
@@ -1606,7 +1373,7 @@ KAMU> /failure-guided-report
       "holdout_labels_excluded_from_priority": true,
       "holdout_not_added_to_training_ledger": true,
       "training_and_holdout_case_ids_disjoint": true,
-      "training_and_holdout_family_templates_disjoint": true,
+      "training_and_holdout_compositions_disjoint": true,
       "separate_seed_namespaces": true,
       "user_facts_unchanged": true,
       "training_ledger_unchanged": true,
@@ -1614,15 +1381,15 @@ KAMU> /failure-guided-report
       "user_feedback_preferences_unchanged": true
     },
     "isolation_passed": true,
-    "candidate_fix_status": "no_counterexample_found_no_fix_auto_promoted",
-    "epistemic_status": "internal_synthetic_graph_diagnostic_not_external_truth_verification",
-    "scope_note": "Training cases prioritize historically declared failure patterns or coverage fallback. Holdout uses separate template families and seed, and is evaluated only after split. Detected mismatches are minimized and queued for source-code review; no automatic source repair or policy promotion occurs. Agreement is relative to the internal bounded is_a graph oracle, not external factual truth or general intelligence.",
-    "evaluation_id": "FGE00001"
+    "candidate_fix_status": "no_composition_counterexample_found_no_fix_auto_promoted",
+    "epistemic_status": "internal_synthetic_composition_oracle_not_external_truth_verification",
+    "scope_note": "This lab tests combinations of graph motifs, not external-world truth. Training priority consumes only declared training-side failures. Holdout uses separate recipe families, IDs, and seed namespace; its cases and labels are never passed to the priority extractor. Mismatches are minimized and queued for source review; no automatic source repair, fact mutation, training update, or policy promotion occurs.",
+    "evaluation_id": "CGE00001"
   },
-  "historical_priority_source_policy": "Only declared failure diagnoses, earlier counterexample mismatch records, boundary failure records, and prior training_cases can influence training pattern priorities. Holdout cases and holdout labels are never read by the priority extractor.",
-  "epistemic_note": "Synthetic graph diagnostic only; mismatch labels require code review and are not external ground truth."
+  "priority_source_policy": "Only prior training-side failure diagnoses and mismatch rows can affect training composition priority; holdout cases and labels are excluded.",
+  "epistemic_note": "Agreement is relative to the internal bounded is_a graph oracle, not external factual truth or general intelligence."
 }
-FAILURE_GUIDED_REPORT> runs=1 latest=FGE00001 train=40/40 holdout=20/20
+COMPOSITIONAL_REPORT> runs=1 latest=CGE00001 train=32/32 holdout=16/16
 
 KAMU> /status
 {
@@ -1632,28 +1399,28 @@ KAMU> /status
     "arousal": 0.35,
     "learning_rate": 0.2,
     "prediction_error": 0.0,
-    "last_action": "generate_and_evaluate_failure_guided_cases",
+    "last_action": "evaluate_compositional_graph_interactions",
     "working_memory_size": 2,
     "broadcast": [
       {
-        "source": "failure_guided_lab",
-        "kind": "failure_guided_discovery_report",
+        "source": "compositional_lab",
+        "kind": "compositional_graph_interaction_report",
         "content": {
-          "evaluation_id": "FGE00001",
-          "training_cases": 40,
+          "evaluation_id": "CGE00001",
+          "training_cases": 32,
           "training_mismatches": 0,
-          "holdout_cases": 20,
+          "holdout_cases": 16,
           "holdout_mismatches": 0,
           "isolation_passed": true
         },
         "confidence": 0.95,
-        "novelty": 0.88,
+        "novelty": 0.9,
         "urgency": 0.0,
         "goal_relevance": 0.95,
         "evidence": [
           "perubahan atau rencana berasal dari perintah eksplisit pengguna"
         ],
-        "score": 0.746
+        "score": 0.75
       },
       {
         "source": "prefrontal_cortex",
@@ -1682,7 +1449,7 @@ KAMU> /status
   "provenance_claims": 0,
   "provenance_evidence_records": 0,
   "provenance_external_checks": 0,
-  "memory_schema_version": 15,
+  "memory_schema_version": 16,
   "feedback_count": 0,
   "average_reward": null,
   "action_values": {},
@@ -1698,7 +1465,10 @@ KAMU> /status
   "routing_evaluation_runs": 0,
   "counterexample_evaluation_runs": 0,
   "adversarial_boundary_evaluation_runs": 0,
-  "failure_guided_evaluation_runs": 1,
+  "failure_guided_evaluation_runs": 0,
+  "compositional_evaluation_runs": 1,
+  "latest_compositional_all_matched": true,
+  "latest_compositional_oracle_match_rate": 1.0,
   "latest_boundary_suite_pass_rate": null,
   "latest_counterexample_oracle_match_rate": null,
   "latest_routing_accuracy": null,
@@ -1734,6 +1504,7 @@ KAMU> /status
     "oracle_backed_counterexample_search_and_minimization",
     "systematic_adversarial_graph_boundary_and_metamorphic_suite",
     "failure_guided_case_discovery_with_sealed_holdout",
+    "compositional_graph_interaction_lab",
     "independent_verifier",
     "multi_strategy_reasoner",
     "global_workspace"
