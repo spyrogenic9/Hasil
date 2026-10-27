@@ -2,31 +2,32 @@ $ node uji.js
 node uji_tahap2.js
 node uji_tahap2_kondisional.js
 node uji_representasi.js
-
+node uji_eksperimen_aktif.js
 node percobaan_tahap2.js 10
 node percobaan_tahap2_kondisional.js 10
 node percobaan_representasi.js 10
+node percobaan_eksperimen_aktif.js
 Mesin langkah
   ok   cara dasar tambah benar untuk semua a,b 0..10 dan biayanya 3b+2 (1 ms)
   ok   pengulangan tanpa pengurang berhenti oleh batas langkah, bukan menggantung (0 ms)
 Pencarian cara
   ok   dari kasus saja ditemukan cara dasar tambah pada ukuran 4 (7 ms)
-  ok   pada ukuran 6 ditemukan cara yang lebih hemat (menukar bila a<b) (433 ms)
+  ok   pada ukuran 6 ditemukan cara yang lebih hemat (menukar bila a<b) (415 ms)
   ok   tidak ada cara lebih murah => mengembalikan null (3 ms)
 Penyimpan
   ok   lupa menghapus yang kuatnya < 0,05 dan indeks ikut bersih (1 ms)
   ok   kapasitas: yang dibuang adalah yang paling lemah, kejadian salah dipertahankan (0 ms)
   ok   tiga jalur tercatat: tulis, panggil, ulang (1 ms)
-  ok   pilihUlang mode galat memilih kejadian salah jauh lebih sering daripada seragam (2 ms)
+  ok   pilihUlang mode galat memilih kejadian salah jauh lebih sering daripada seragam (1 ms)
 Sistem
-  ok   tanpa belajar sepi: tidak pernah menemukan cara (kontrol) (1 ms)
-  ok   dengan belajar sepi: satu malam menemukan cara tambah yang benar pada soal baru (327 ms)
-  ok   kesalahan menjadi pelajaran: cara yang gagal di luar rentang dipersempit lalu diganti (311 ms)
+  ok   tanpa belajar sepi: tidak pernah menemukan cara (kontrol) (2 ms)
+  ok   dengan belajar sepi: satu malam menemukan cara tambah yang benar pada soal baru (308 ms)
+  ok   kesalahan menjadi pelajaran: cara yang gagal di luar rentang dipersempit lalu diganti (310 ms)
   ok   gerbang pembuktian menolak cara yang cocok pada kasus tapi gagal pada soal segar (1 ms)
-  ok   kapasitas ingatan tidak pernah terlampaui selama 14 hari (1534 ms)
-  ok   deterministik: seed sama => hasil sama (1355 ms)
+  ok   kapasitas ingatan tidak pernah terlampaui selama 14 hari (1527 ms)
+  ok   deterministik: seed sama => hasil sama (1358 ms)
   ok   soal ukur tidak pernah memuat pasangan yang ada di jadwal latihan (1 ms)
-  ok   belajar sepi tanpa masukan baru memperbaiki kinerja (akurasi 0,x -> 1,0) (690 ms)
+  ok   belajar sepi tanpa masukan baru memperbaiki kinerja (akurasi 0,x -> 1,0) (682 ms)
 
 17 lulus, 0 gagal
 Pembentukan konsep
@@ -70,6 +71,20 @@ Induksi representasi dari pengalaman
   ok   konsep representasi membantu cara tambah yang dipelajari menyelesaikan soal besar baru
 
 12 lulus, 0 gagal
+Pemilihan eksperimen aktif dan pembantahan hipotesis
+  ok   pembelajar hanya menerima observasi dan hitungan tindakan, bukan kapasitas
+  ok   rencana pertama sengaja menguji ekstrapolasi bobot 64
+  ok   lingkungan seragam mendukung prediksi rasio pada slot baru
+  ok   uji aktif berikutnya memeriksa slot ke-4, bukan menerima satu konfirmasi sebagai bukti universal
+  ok   kontra-contoh radix campuran membantah rasio, bukan dipaksa cocok
+  ok   setelah rasio dibantah, slot berikutnya diukur tanpa membuat prediksi palsu
+  ok   representasi campuran menjawab keadaan baru yang tidak ada di memori episodik
+  ok   representasi seragam tetap menggeneralisasi ke keadaan baru di luar riwayat
+  ok   pembelajar menyimpan keputusan eksperimen dan dapat mengekspor keadaan
+  ok   model aditif menolak ekstrapolasi slot yang belum diamati pada lingkungan campuran
+  ok   anggaran eksperimen membatasi pencarian dan hasil tidak berpura-pura punya bukti
+
+11 lulus, 0 gagal
 Tahap 2 — perbandingan baseline vs konsep
 Seed: 10; soal/seed: 5
 Baseline tahap 1 lulus: 0/50
@@ -77,32 +92,7 @@ Runner konsep lulus:    50/50
 Konsep terbentuk:        10/10
 Langkah kognitif/soal:   6
 Ekuivalen primitif/soal: 334595.6
-Detail: C:\Users\putra\Downloads\MKV\Berkembang_Tahap2_2\hasil_tahap2.json
-Tahap 2.1 — induksi transisi berkondisi
-Seed: 10; soal/seed: 5
-Baseline lulus: 0/50
-Runner konsep lulus: 50/50
-Seed dengan dua konsep: 10/10
-Langkah kognitif/soal: 7.6
-Ekuivalen primitif/soal: 907757.2
-Detail: C:\Users\putra\Downloads\MKV\Berkembang_Tahap2_2\hasil_tahap2_kondisional.json
-Tahap 2.2 — induksi representasi dari pengalaman
-Seed/base: 10; soal/seed/base: 5
-Radix lingkungan 10: bobot [1,10,100,1000], rasio 10
-  Model decode: 50/50; hafalan: 0/50
-  Baseline hafalan + hitung: 0/50; baseline angka saja: 0/50; sistem dengan konsep: 50/50
-  Langkah kognitif: 6; ekuivalen primitif: 217326.5
-Radix lingkungan 7: bobot [1,7,49,343], rasio 7
-  Model decode: 50/50; hafalan: 0/50
-  Baseline hafalan + hitung: 0/50; baseline angka saja: 0/50; sistem dengan konsep: 50/50
-  Langkah kognitif: 6; ekuivalen primitif: 217326.5
-Radix lingkungan 6: bobot [1,6,36,216], rasio 6
-  Model decode: 50/50; hafalan: 0/50
-  Baseline hafalan + hitung: 0/50; baseline angka saja: 0/50; sistem dengan konsep: 50/50
-  Langkah kognitif: 6; ekuivalen primitif: 217326.5
-Detail: C:\Users\putra\Downloads\MKV\Berkembang_Tahap2_2\hasil_representasi.json
-
-hasil_tahap2.json:
+Detail: C:\Users\putra\Downloads\MKV\Berkembang_Tahap2_3\hasil_tahap2.json:
 {
   "tahap": 2,
   "seed": 10,
@@ -1507,7 +1497,14 @@ hasil_tahap2.json:
   ]
 }
 
-hasil_tahap2_kondisional.json:
+Tahap 2.1 — induksi transisi berkondisi
+Seed: 10; soal/seed: 5
+Baseline lulus: 0/50
+Runner konsep lulus: 50/50
+Seed dengan dua konsep: 10/10
+Langkah kognitif/soal: 7.6
+Ekuivalen primitif/soal: 907757.2
+Detail: C:\Users\putra\Downloads\MKV\Berkembang_Tahap2_3\hasil_tahap2_kondisional.json:
 {
   "eksperimen": "induksi transisi berkondisi tahap 2.1",
   "seed": 10,
@@ -3509,7 +3506,21 @@ hasil_tahap2_kondisional.json:
   ]
 }
 
-hasil_representasi.json:
+Tahap 2.2 — induksi representasi dari pengalaman
+Seed/base: 10; soal/seed/base: 5
+Radix lingkungan 10: bobot [1,10,100,1000], rasio 10
+  Model decode: 50/50; hafalan: 0/50
+  Baseline hafalan + hitung: 0/50; baseline angka saja: 0/50; sistem dengan konsep: 50/50
+  Langkah kognitif: 6; ekuivalen primitif: 217326.5
+Radix lingkungan 7: bobot [1,7,49,343], rasio 7
+  Model decode: 50/50; hafalan: 0/50
+  Baseline hafalan + hitung: 0/50; baseline angka saja: 0/50; sistem dengan konsep: 50/50
+  Langkah kognitif: 6; ekuivalen primitif: 217326.5
+Radix lingkungan 6: bobot [1,6,36,216], rasio 6
+  Model decode: 50/50; hafalan: 0/50
+  Baseline hafalan + hitung: 0/50; baseline angka saja: 0/50; sistem dengan konsep: 50/50
+  Langkah kognitif: 6; ekuivalen primitif: 217326.5
+Detail: C:\Users\putra\Downloads\MKV\Berkembang_Tahap2_3\hasil_representasi.json:
 {
   "tahap": "2.2",
   "tujuan": "induksi bobot representasi yang tidak diberi label dan pemakaian pada soal penjumlahan tak dikenal",
@@ -13369,6 +13380,617 @@ hasil_representasi.json:
           }
         }
       ]
+    }
+  ]
+}
+
+Tahap 2.3 — eksperimen aktif untuk membedakan hipotesis
+Variasi batas pengalaman awal: 10
+Prediksi geometrik dikonfirmasi (lingkungan seragam): 20/20
+Prediksi geometrik dibantah (lingkungan campuran): 10/10
+Bobot slot berikutnya diukur tanpa prediksi setelah rasio ditolak: 10/10
+Keadaan baru berhasil didekode oleh model: 20/20
+Baseline hafalan persis gagal pada keadaan baru: 20/20
+Detail: C:\Users\putra\Downloads\MKV\Berkembang_Tahap2_3\hasil_eksperimen_aktif.json:
+{
+  "tahap": "2.3",
+  "jenis": "pemilihan eksperimen aktif dan pembantahan hipotesis",
+  "variasiBatasLatihan": 10,
+  "kondisi": {
+    "seragam": {
+      "kapasitas": "disembunyikan dari pembelajar",
+      "bobotTeruji": [
+        1,
+        4,
+        16,
+        64,
+        256
+      ]
+    },
+    "campuran": {
+      "kapasitas": "disembunyikan dari pembelajar",
+      "bobotTeruji": [
+        1,
+        4,
+        16,
+        48,
+        240
+      ]
+    }
+  },
+  "hasil": {
+    "prediksiGeometrikDikonfirmasi": "20/20",
+    "prediksiGeometrikDibantahPadaLingkunganCampuran": "10/10",
+    "slotCampuranBerikutnyaDiukurTanpaPrediksi": "10/10",
+    "keadaanBaruBerhasilDidekode": "20/20",
+    "baselineHafalanTidakDapatMenjawabKeadaanBaru": "20/20"
+  },
+  "keputusan": [
+    "Rasio berulang diperlakukan sebagai hipotesis yang dapat dibantah, bukan hukum universal.",
+    "Setelah kontra-contoh, sistem berhenti mengekstrapolasi dan mengukur slot berikutnya melalui pengalaman.",
+    "Semua bobot yang berhasil dipelajari dapat mendekode keadaan baru yang tidak ada pada riwayat pengamatan.",
+    "Ini masih pencarian di keluarga model jumlah berbobot koordinat dan lingkungan penghitung; belum merupakan penemuan representasi tanpa bias rancangan."
+  ],
+  "variasi": [
+    {
+      "percobaan": 1,
+      "batasPengalamanAwal": 18,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 2,
+      "batasPengalamanAwal": 19,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 3,
+      "batasPengalamanAwal": 20,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 4,
+      "batasPengalamanAwal": 21,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 5,
+      "batasPengalamanAwal": 22,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 6,
+      "batasPengalamanAwal": 23,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 7,
+      "batasPengalamanAwal": 24,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 8,
+      "batasPengalamanAwal": 18,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 9,
+      "batasPengalamanAwal": 19,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
+    },
+    {
+      "percobaan": 10,
+      "batasPengalamanAwal": 20,
+      "seragam": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          64,
+          256
+        ],
+        "rasioAkhir": 4,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-didukung",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 64
+          },
+          {
+            "status": "hipotesis-didukung",
+            "slot": 4,
+            "prediksi": 256,
+            "teramati": 256
+          }
+        ],
+        "jawabanKeadaanBaru": 475,
+        "baselineHafalan": null
+      },
+      "campuran": {
+        "bobotAkhir": [
+          1,
+          4,
+          16,
+          48,
+          240
+        ],
+        "rasioAkhir": null,
+        "hasilEksperimen": [
+          {
+            "status": "hipotesis-dibantah",
+            "slot": 3,
+            "prediksi": 64,
+            "teramati": 48
+          },
+          {
+            "status": "diukur-tanpa-prediksi",
+            "slot": 4,
+            "prediksi": null,
+            "teramati": 240
+          }
+        ],
+        "jawabanKeadaanBaru": 462,
+        "baselineHafalan": null
+      }
     }
   ]
 }
