@@ -1,4 +1,4 @@
-PS C:\GTPS\Gurotopia> Write-Host "`n===== INPUT COMMAND DISPATCHER ====="
+[PS C:\GTPS\Gurotopia> Write-Host "`n===== INPUT COMMAND DISPATCHER ====="
 
 ===== INPUT COMMAND DISPATCHER =====
 PS C:\GTPS\Gurotopia> Get-Content .\include\action\input.cpp
@@ -543,3 +543,4 @@ const std::unordered_map<std::string_view, void(*)(ENetEvent&, std::string_view)
     {"/furious", on::Action}, {"/rolleyes", on::Action}, {"/foldarms", on::Action}, {"/fa", on::Action}, {"/stubborn", on::Action}, {"/fold", on::Action},
     {"/dab", on::Action}, {"/sassy", on::Action}, {"/dance2", on::Action}, {"/march", on::Action}, {"/grumpy", on::Action}, {"/shy", on::Action}
 };
+](https://github.com/spyrogenic9/Hasil/blob/main/hasil.md?plain=1)
