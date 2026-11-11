@@ -1,22 +1,10 @@
-PS C:\GTPS\Gurotopia> Get-Item .\main.exe,
->>          .\include\database\peer.cpp,
->>          .\include\database\peer.hpp,
->>          .\include\database\database.cpp |
->>     Select-Object Name, LastWriteTime, Length |
->>     Format-Table -AutoSize
-
-Name         LastWriteTime                 Length
-----         -------------                 ------
-main.exe     Rabu, 11, 11, 2026 04.12.38 23146090
-peer.cpp     Rabu, 11, 11, 2026 04.10.41    10951
-peer.hpp     Rabu, 11, 11, 2026 04.05.23     7362
-database.cpp Rabu, 11, 11, 2026 04.06.45     6517
-
-
+PS C:\GTPS\Gurotopia> $files = Get-ChildItem . -Recurse -File -Include *.cpp,*.hpp,*.h,*.cc |
+>>     Where-Object {
+>>         $_.FullName -notmatch '\\(\.git|build|bin|obj|vendor)\\'
+>>     }
 PS C:\GTPS\Gurotopia>
-PS C:\GTPS\Gurotopia> # 2. Cari seluruh implementasi dan pemeriksaan role
-PS C:\GTPS\Gurotopia> Get-ChildItem -Recurse -File -Include *.cpp,*.hpp |
->>     Select-String -Pattern '\bOWNER\b|\bDEVELOPER\b|\bMODERATOR\b|\bPLAYER\b|\.role\b|->role\b' |
+PS C:\GTPS\Gurotopia> $files |
+>>     Select-String -Pattern '\b(OWNER|DEVELOPER|MODERATOR|PLAYER)\b|peer_is_(super_)?staff_role|(?:->|\.)role\b' |
 >>     Format-Table Path,LineNumber,Line -Wrap
 
 Path                                                            LineNumber Line
@@ -40,20 +28,14 @@ C:\GTPS\Gurotopia\include\action\join_request.cpp                       27      
                                                                            "growid", "", true), granted ? " (`2ACCESS G
                                                                            RANTED``)" : ""));
 C:\GTPS\Gurotopia\include\action\join_request.cpp                       70         if (pPeer->user_id == world.owner)
-C:\GTPS\Gurotopia\include\action\join_request.cpp                       84                 on::Spawn(*event.peer, pOthe
-                                                                           rs->netid, pOthers->user_id, pOthers->pos, p
-                                                                           Others->display_growid, pOthers->country, pO
-                                                                           thers->role, pOthers->role >= DEVELOPER, fal
-                                                                           se);
-C:\GTPS\Gurotopia\include\action\join_request.cpp                       85                 on::Spawn(*peer, pPeer->neti
-                                                                           d, pPeer->user_id, pPeer->rest_pos, pPeer->d
-                                                                           isplay_growid, pPeer->country, pPeer->role,
-                                                                           pPeer->role >= DEVELOPER, false);
-C:\GTPS\Gurotopia\include\action\join_request.cpp                       96         on::Spawn(*event.peer, pPeer->netid,
-                                                                            pPeer->user_id, pPeer->rest_pos, pPeer->dis
-                                                                           play_growid, pPeer->country, pPeer->role, pP
-                                                                           eer->role >= DEVELOPER, true);
-C:\GTPS\Gurotopia\include\action\join_request.cpp                      129         on::ConsoleMessage(event.peer, exc.w
+C:\GTPS\Gurotopia\include\action\join_request.cpp                       90                                      peer_is_staff_role(pOthers->role),
+C:\GTPS\Gurotopia\include\action\join_request.cpp                       91                                      peer_is_super_staff_role(pOthers->role)
+                                                                           ,
+C:\GTPS\Gurotopia\include\action\join_request.cpp                      100                                      peer_is_staff_role(pPeer->role),
+C:\GTPS\Gurotopia\include\action\join_request.cpp                      101                                      peer_is_super_staff_role(pPeer->role),
+C:\GTPS\Gurotopia\include\action\join_request.cpp                      119                      peer_is_staff_role(pPeer->role),
+C:\GTPS\Gurotopia\include\action\join_request.cpp                      120                      peer_is_super_staff_role(pPeer->role),
+C:\GTPS\Gurotopia\include\action\join_request.cpp                      154         on::ConsoleMessage(event.peer, exc.w
                                                                            hat()); // @note tell the player why
 C:\GTPS\Gurotopia\include\action\wrench.cpp                             97                             .add_button("ign
                                                                            ore_player", "`wIgnore Player``")
@@ -75,12 +57,21 @@ C:\GTPS\Gurotopia\include\database\peer.cpp                             96      
                                                                            );
 C:\GTPS\Gurotopia\include\database\peer.cpp                            154      const unsigned role_value = static_cast<uns
                                                                            igned>(this->role);
-C:\GTPS\Gurotopia\include\database\peer.hpp                             63     OWNER     = 0,
-C:\GTPS\Gurotopia\include\database\peer.hpp                             64     DEVELOPER = 1,
-C:\GTPS\Gurotopia\include\database\peer.hpp                             65     MODERATOR = 2,
-C:\GTPS\Gurotopia\include\database\peer.hpp                             66     PLAYER    = 3
-C:\GTPS\Gurotopia\include\database\peer.hpp                            100     u_char role{PLAYER};
-C:\GTPS\Gurotopia\include\database\peer.hpp                            233     ::pos speed{}; // @note player movement
+C:\GTPS\Gurotopia\include\database\peer.hpp                             62 constexpr bool peer_is_staff_role(u_char val
+                                                                           ue) noexcept
+C:\GTPS\Gurotopia\include\database\peer.hpp                             64     return value == OWNER ||
+C:\GTPS\Gurotopia\include\database\peer.hpp                             65            value == DEVELOPER ||
+C:\GTPS\Gurotopia\include\database\peer.hpp                             66            value == MODERATOR;
+C:\GTPS\Gurotopia\include\database\peer.hpp                             69 constexpr bool peer_is_super_staff_role(u_ch
+                                                                           ar value) noexcept
+C:\GTPS\Gurotopia\include\database\peer.hpp                             71     return value == OWNER || value == DEVELO
+                                                                           PER;
+C:\GTPS\Gurotopia\include\database\peer.hpp                             74     OWNER     = 0,
+C:\GTPS\Gurotopia\include\database\peer.hpp                             75     DEVELOPER = 1,
+C:\GTPS\Gurotopia\include\database\peer.hpp                             76     MODERATOR = 2,
+C:\GTPS\Gurotopia\include\database\peer.hpp                             77     PLAYER    = 3
+C:\GTPS\Gurotopia\include\database\peer.hpp                            111     u_char role{PLAYER};
+C:\GTPS\Gurotopia\include\database\peer.hpp                            244     ::pos speed{}; // @note player movement
                                                                            (velocity(x), gravity(y)), higher gravity =
                                                                            smaller jumps
 C:\GTPS\Gurotopia\include\database\world.cpp                           140                 blob.i32(this->owner);
@@ -98,7 +89,7 @@ C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp                    41      
                                                                            te if block is public skip validating if pee
                                                                            r is owner or access
 C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp                    42             if ((world->owner && !world->is_
-                                                                           public && !pPeer->role) &&
+                                                                           public && pPeer->role == PLAYER) &&
 C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp                    43                 (pPeer->user_id != world->ow
                                                                            ner && std::ranges::find(world->access, pPee
                                                                            r->user_id) == world->access.end())) return;
@@ -125,13 +116,3 @@ C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp                   719      
 C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp                   721                         world->owner = pPeer
                                                                            ->user_id;
 C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp                   774                 .netid = world->owner,
-
-
-PS C:\GTPS\Gurotopia>
-PS C:\GTPS\Gurotopia> # 3. Periksa proses server yang sedang berjalan
-PS C:\GTPS\Gurotopia> Get-CimInstance Win32_Process -Filter "Name='main.exe'" |
->>     Select-Object ProcessId,ExecutablePath,CommandLine
-
-ProcessId ExecutablePath             CommandLine
---------- --------------             -----------
-    10384 C:\GTPS\Gurotopia\main.exe C:\GTPS\Gurotopia\main.exe
