@@ -1,9 +1,119 @@
-PS C:\GTPS\login-gurotopia> Get-Content .\index.ts | Select-Object -Skip 135 -First 180
-/**
- * @note validate login endpoint - validates GrowID credentials from MySQL
- * @param req - express request with growId, password, _token
- * @param res - express response with token
- */
+PS C:\GTPS\Gurotopia> Get-Content .\include\action\tankIDName.cpp |
+>> Select-Object -First 110
+#include "pch.hpp"
+
+#include "automate/holiday.hpp"
+#include "admin/admin.hpp"
+#include "security/login_session.hpp"
+
+#include <algorithm>
+
+#include <charconv>
+#include <cctype>
+
+#include "tankIDName.hpp"
+
+namespace
+{
+    std::string trim_field(std::string value)
+    {
+        const auto is_edge_space = [](unsigned char c)
+        {
+            return c == '\r' || c == '\n' || c == '\0' || c == ' ' || c == '\t';
+        };
+        while (!value.empty() && is_edge_space(static_cast<unsigned char>(value.front())))
+            value.erase(value.begin());
+        while (!value.empty() && is_edge_space(static_cast<unsigned char>(value.back())))
+            value.pop_back();
+        return value;
+    }
+}
+
+/* GameLogicComponent::OnInitialLogonAccepted(VariantList*) */
+void action::tankIDName(ENetEvent& event, const std::string& header)
+{
+    if (event.peer == nullptr || event.peer->data == nullptr) return;
+    ::peer *pPeer = static_cast<::peer*>(event.peer->data);
+
+    // The receive layer normalizes line breaks, but some client builds send
+    // CRLF or a mixture of line and pipe separators. Normalize again here.
+    std::string normalized = header;
+    // receive.cpp already converts LF delimiters to '|'. Remove the CR half
+    // of CRLF instead of converting it again (which would create empty fields
+    // and shift every key/value pair by one position).
+    std::erase(normalized, '\r');
+    for (char& c : normalized)
+        if (c == '\n') c = '|';
+
+    const std::vector<std::string> fields = readch(normalized, '|');
+    if (fields.size() < 2)
+    {
+        print("[AUTH] ignored empty/short tankIDName packet\n");
+        return;
+    }
+
+    std::string protocol{};
+    std::string requested_growid{};
+    std::string requested_password{};
+    std::string uuid_text{};
+    int requested_uid{};
+    bool has_user_id = false;
+    bool user_id_valid = false;
+    bool has_uuid_token = false;
+    bool uuid_token_valid = false;
+    std::uint32_t uuid_token{};
+    bool growid_field = false;
+    bool password_field = false;
+
+    // Packet fields are key/value pairs. Step by two so an empty value
+    // (e.g. requestedName|) cannot shift the parser onto the next key.
+    for (std::size_t i = 0; i + 1 < fields.size(); i += 2)
+    {
+        const std::string key = trim_field(fields[i]);
+        const std::string value = trim_field(fields[i + 1]);
+
+        if (key == "tankIDName")
+        {
+            requested_growid = value;
+            growid_field = !value.empty();
+        }
+        else if (key == "tankIDPass")
+        {
+            requested_password = value;
+            password_field = !value.empty();
+        }
+        else if (key == "protocol") protocol = value;
+        else if (key == "country") pPeer->country = value;
+        else if (key == "user")
+        {
+            has_user_id = true;
+            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), requested_uid);
+            user_id_valid = !value.empty() && parsed.ec == std::errc{} &&
+                parsed.ptr == value.data() + value.size() && requested_uid > 0;
+        }
+        else if (key == "UUIDToken")
+        {
+            has_uuid_token = true;
+            uuid_text = value;
+            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), uuid_token);
+            uuid_token_valid = !value.empty() && parsed.ec == std::errc{} &&
+                parsed.ptr == value.data() + value.size() && uuid_token != 0;
+        }
+        else if (key == "game_version")
+        {
+            try { pPeer->game_version = std::stof(value); }
+            catch (const std::logic_error&) {}
+        }
+    }
+
+    // requestedName is also routed here by legacy dispatch. It is not a
+    // complete login packet and must not cause a disconnect by itself.
+    if (protocol.empty())
+    {
+PS C:\GTPS\Gurotopia> cd C:\GTPS\login-gurotopia
+PS C:\GTPS\login-gurotopia>
+PS C:\GTPS\login-gurotopia> Get-Content .\index.ts |
+>> Select-Object -Skip 140 -First 165
 app.all(
   '/player/growid/login/validate',
   async (req: Request, res: Response) => {
@@ -169,331 +279,163 @@ app.all(
         message: 'Internal Server Error',
       });
     }
-  },
-);
+PS C:\GTPS\login-gurotopia> Get-Content .\index.ts |
+>> Select-Object -Skip 313 -First 150
+app.all('/player/growid/checktoken', async (_req: Request, res: Response) => {
+  return res.redirect(307, '/player/growid/validate/checktoken');
+});
 
 /**
- * @note first checktoken endpoint - redirects to validate endpoint
+ * @note second checktoken endpoint - validates token and returns updated token
  * @param req - express request with refreshToken and clientData
  * @param res - express response with updated token
  */
-app.all('/player/growid/checktoken', async (_req: Request, res: Response) => {
-  return res.redirect(307, '/player/growid/validate/checktoken');
-PS C:\GTPS\login-gurotopia> Get-ChildItem . -Recurse -File -Include *.ts |
->> Where-Object { $_.FullName -notmatch '\\node_modules\\|\\dist\\' } |
->> Select-String -Pattern 'checktoken|UUIDToken|ticket|ltoken|protocol stage|token_status' -Context 5,12
+app.all(
+  '/player/growid/validate/checktoken',
+  async (req: Request, res: Response) => {
+    try {
+      let refreshToken: string | undefined;
+      let clientData: string | undefined;
+      let source = 'empty';
+      const contentType = req.headers['content-type'] || '';
 
-  index.ts:305:    }
-  index.ts:306:  },
-  index.ts:307:);
-  index.ts:308:
-  index.ts:309:/**
-> index.ts:310: * @note first checktoken endpoint - redirects to validate endpoint
-  index.ts:311: * @param req - express request with refreshToken and clientData
-  index.ts:312: * @param res - express response with updated token
-  index.ts:313: */
-> index.ts:314:app.all('/player/growid/checktoken', async (_req: Request, res: Response) => {
-> index.ts:315:  return res.redirect(307, '/player/growid/validate/checktoken');
-  index.ts:316:});
-  index.ts:317:
-  index.ts:318:/**
-> index.ts:319: * @note second checktoken endpoint - validates token and returns updated token
-  index.ts:320: * @param req - express request with refreshToken and clientData
-  index.ts:321: * @param res - express response with updated token
-  index.ts:322: */
-  index.ts:323:app.all(
-> index.ts:324:  '/player/growid/validate/checktoken',
-  index.ts:325:  async (req: Request, res: Response) => {
-  index.ts:326:    try {
-  index.ts:327:      let refreshToken: string | undefined;
-  index.ts:328:      let clientData: string | undefined;
-  index.ts:329:      let source = 'empty';
-  index.ts:330:      const contentType = req.headers['content-type'] || '';
-  index.ts:331:
-  index.ts:332:      if (typeof req.body === 'object' && req.body !== null) {
-  index.ts:333:        const formData = req.body as Record<string, string>;
-  index.ts:334:
-  index.ts:335:        if ('refreshToken' in formData || 'clientData' in formData) {
-  index.ts:336:          refreshToken = formData.refreshToken;
-  index.ts:377:            source = 'raw-stream';
-  index.ts:378:          }
-  index.ts:379:        }
-  index.ts:380:      }
-  index.ts:381:
-> index.ts:382:      console.log(`[CHECKTOKEN] Parsed as ${source}`);
-  index.ts:383:
-  index.ts:384:      if (!refreshToken || !clientData) {
-  index.ts:385:        console.log(`[ERROR]: Missing refreshToken or clientData`);
-  index.ts:386:        res.status(200).json({
-  index.ts:387:          status: 'error',
-  index.ts:388:          message: 'Missing refreshToken or clientData',
-  index.ts:389:        });
-  index.ts:390:        return;
-  index.ts:391:      }
-  index.ts:392:
-  index.ts:393:      let decodedRefreshToken = Buffer.from(refreshToken, 'base64').toString(
-  index.ts:394:        'utf-8',
-  index.ts:397:      // @note sync credentials check with db
-  index.ts:398:      const tokenParams = new URLSearchParams(decodedRefreshToken);
-  index.ts:399:      const tokenGrowId = tokenParams.get('growId');
-  index.ts:400:      const tokenPassword = tokenParams.get('password');
-  index.ts:401:      const isReg = tokenParams.get('reg') === '1';
-> index.ts:402:      console.log(`[CHECKTOKEN] parsed growId=${Boolean(tokenGrowId)} password=${Boolean(tokenPassword)}
- registration=${isReg}`);
-  index.ts:403:
-  index.ts:404:      if (tokenGrowId) {
-  index.ts:405:        const rows = await db`SELECT password FROM peer WHERE growid = ${tokenGrowId} LIMIT 1`;
-> index.ts:406:        console.log(`[CHECKTOKEN] accountFound=${rows.length > 0} passwordMatches=${rows.length > 0 && r
-ows[0].password === tokenPassword}`);
-  index.ts:407:        if (isReg) {
-  index.ts:408:          if (rows.length > 0) {
-  index.ts:409:            res.status(200).json({
-  index.ts:410:              status: 'error',
-  index.ts:411:              message: 'GrowID is already taken',
-  index.ts:412:            });
-  index.ts:413:            return;
-  index.ts:414:          }
-  index.ts:415:        } else if (tokenPassword) {
-  index.ts:416:          if (rows.length === 0 || rows[0].password !== tokenPassword) {
-  index.ts:417:            res.status(200).json({
-  index.ts:418:              status: 'error',
+      if (typeof req.body === 'object' && req.body !== null) {
+        const formData = req.body as Record<string, string>;
 
+        if ('refreshToken' in formData || 'clientData' in formData) {
+          refreshToken = formData.refreshToken;
+          clientData = formData.clientData;
+          source = contentType.includes('application/json')
+            ? 'json/object'
+            : 'form-urlencoded';
+        } else if (Object.keys(formData).length === 1) {
+          const rawPayload = Object.keys(formData)[0];
+          const params = new URLSearchParams(rawPayload);
+          refreshToken = params.get('refreshToken') || undefined;
+          clientData = params.get('clientData') || undefined;
+          if (refreshToken || clientData) {
+            source = 'single-key-form-payload';
+          }
+        }
+      } else if (typeof req.body === 'string' && req.body.length > 0) {
+        const params = new URLSearchParams(req.body);
+        refreshToken = params.get('refreshToken') || undefined;
+        clientData = params.get('clientData') || undefined;
+        source = 'string/body-parser';
+      }
 
-PS C:\GTPS\login-gurotopia> Set-Location C:\GTPS\Gurotopia
+      if (
+        (!refreshToken || !clientData) &&
+        req.readable &&
+        !req.readableEnded
+      ) {
+        const rawBody = await new Promise<string>((resolve, reject) => {
+          let rawPayload = '';
+
+          req.on('data', (chunk: Buffer | string) => {
+            rawPayload += chunk.toString();
+          });
+          req.on('end', () => resolve(rawPayload));
+          req.on('error', reject);
+        });
+
+        if (rawBody) {
+          const params = new URLSearchParams(rawBody);
+          refreshToken = params.get('refreshToken') || refreshToken;
+          clientData = params.get('clientData') || clientData;
+          if (refreshToken || clientData) {
+            source = 'raw-stream';
+          }
+        }
+      }
+
+      console.log(`[CHECKTOKEN] Parsed as ${source}`);
+
+      if (!refreshToken || !clientData) {
+        console.log(`[ERROR]: Missing refreshToken or clientData`);
+        res.status(200).json({
+          status: 'error',
+          message: 'Missing refreshToken or clientData',
+        });
+        return;
+      }
+
+      let decodedRefreshToken = Buffer.from(refreshToken, 'base64').toString(
+        'utf-8',
+      );
+
+      // @note sync credentials check with db
+      const tokenParams = new URLSearchParams(decodedRefreshToken);
+      const tokenGrowId = tokenParams.get('growId');
+      const tokenPassword = tokenParams.get('password');
+      const isReg = tokenParams.get('reg') === '1';
+      console.log(`[CHECKTOKEN] parsed growId=${Boolean(tokenGrowId)} password=${Boolean(tokenPassword)} registration=${isReg}`);
+
+      if (tokenGrowId) {
+        const rows = await db`SELECT password FROM peer WHERE growid = ${tokenGrowId} LIMIT 1`;
+        console.log(`[CHECKTOKEN] accountFound=${rows.length > 0} passwordMatches=${rows.length > 0 && rows[0].password === tokenPassword}`);
+        if (isReg) {
+          if (rows.length > 0) {
+            res.status(200).json({
+              status: 'error',
+              message: 'GrowID is already taken',
+            });
+            return;
+          }
+        } else if (tokenPassword) {
+          if (rows.length === 0 || rows[0].password !== tokenPassword) {
+            res.status(200).json({
+              status: 'error',
+              message: 'Invalid credentials in token',
+            });
+            return;
+          }
+        }
+      }
+
+      if (!isReg && decodedRefreshToken.includes('&reg=0')) {
+        decodedRefreshToken = decodedRefreshToken.replace('&reg=0', '');
+      }
+
+      const token = Buffer.from(
+        decodedRefreshToken.replace(
+          /(_token=)[^&]*/,
+          `$1${Buffer.from(clientData).toString('base64')}`,
+        ),
+      ).toString('base64');
+
+      res.send(
+        JSON.stringify({
+          status: 'success',
+          message: 'Account Validated.',
+          token,
+          url: '',
+          accountType: 'growtopia',
+          accountAge: 2,
+        }),
+      );
+    } catch (error) {
+      console.log(`[ERROR]: ${error}`);
+      res.status(200).json({
+        status: 'error',
+        message: 'Internal Server Error',
+      });
+    }
+  },
+);
+
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`[SERVER] Running on http://localhost:${PORT}`);
+});
+
+export default app;
+PS C:\GTPS\login-gurotopia> cd C:\GTPS\Gurotopia
 PS C:\GTPS\Gurotopia>
-PS C:\GTPS\Gurotopia> Get-Content .\include\action\tankIDName.cpp |
->> Select-Object -First 180
-#include "pch.hpp"
-
-#include "automate/holiday.hpp"
-#include "admin/admin.hpp"
-#include "security/login_session.hpp"
-
-#include <algorithm>
-
-#include <charconv>
-#include <cctype>
-
-#include "tankIDName.hpp"
-
-namespace
-{
-    std::string trim_field(std::string value)
-    {
-        const auto is_edge_space = [](unsigned char c)
-        {
-            return c == '\r' || c == '\n' || c == '\0' || c == ' ' || c == '\t';
-        };
-        while (!value.empty() && is_edge_space(static_cast<unsigned char>(value.front())))
-            value.erase(value.begin());
-        while (!value.empty() && is_edge_space(static_cast<unsigned char>(value.back())))
-            value.pop_back();
-        return value;
-    }
-}
-
-/* GameLogicComponent::OnInitialLogonAccepted(VariantList*) */
-void action::tankIDName(ENetEvent& event, const std::string& header)
-{
-    if (event.peer == nullptr || event.peer->data == nullptr) return;
-    ::peer *pPeer = static_cast<::peer*>(event.peer->data);
-
-    // The receive layer normalizes line breaks, but some client builds send
-    // CRLF or a mixture of line and pipe separators. Normalize again here.
-    std::string normalized = header;
-    // receive.cpp already converts LF delimiters to '|'. Remove the CR half
-    // of CRLF instead of converting it again (which would create empty fields
-    // and shift every key/value pair by one position).
-    std::erase(normalized, '\r');
-    for (char& c : normalized)
-        if (c == '\n') c = '|';
-
-    const std::vector<std::string> fields = readch(normalized, '|');
-    if (fields.size() < 2)
-    {
-        print("[AUTH] ignored empty/short tankIDName packet\n");
-        return;
-    }
-
-    std::string protocol{};
-    std::string requested_growid{};
-    std::string requested_password{};
-    std::string uuid_text{};
-    int requested_uid{};
-    bool has_user_id = false;
-    bool user_id_valid = false;
-    bool has_uuid_token = false;
-    bool uuid_token_valid = false;
-    std::uint32_t uuid_token{};
-    bool growid_field = false;
-    bool password_field = false;
-
-    // Packet fields are key/value pairs. Step by two so an empty value
-    // (e.g. requestedName|) cannot shift the parser onto the next key.
-    for (std::size_t i = 0; i + 1 < fields.size(); i += 2)
-    {
-        const std::string key = trim_field(fields[i]);
-        const std::string value = trim_field(fields[i + 1]);
-
-        if (key == "tankIDName")
-        {
-            requested_growid = value;
-            growid_field = !value.empty();
-        }
-        else if (key == "tankIDPass")
-        {
-            requested_password = value;
-            password_field = !value.empty();
-        }
-        else if (key == "protocol") protocol = value;
-        else if (key == "country") pPeer->country = value;
-        else if (key == "user")
-        {
-            has_user_id = true;
-            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), requested_uid);
-            user_id_valid = !value.empty() && parsed.ec == std::errc{} &&
-                parsed.ptr == value.data() + value.size() && requested_uid > 0;
-        }
-        else if (key == "UUIDToken")
-        {
-            has_uuid_token = true;
-            uuid_text = value;
-            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), uuid_token);
-            uuid_token_valid = !value.empty() && parsed.ec == std::errc{} &&
-                parsed.ptr == value.data() + value.size() && uuid_token != 0;
-        }
-        else if (key == "game_version")
-        {
-            try { pPeer->game_version = std::stof(value); }
-            catch (const std::logic_error&) {}
-        }
-    }
-
-    // requestedName is also routed here by legacy dispatch. It is not a
-    // complete login packet and must not cause a disconnect by itself.
-    if (protocol.empty())
-    {
-        print("[AUTH] ignored non-auth name request (protocol field absent)\n");
-        return;
-    }
-    try
-    {
-        if (std::stoi(protocol) <= 0) return;
-    }
-    catch (...) { return; }
-
-    bool loaded = false;
-    bool ticket_accepted = false;
-    std::string ticket_status = "not-present";
-
-    if (has_user_id && user_id_valid && has_uuid_token && uuid_token_valid)
-    {
-        const auto result = login_session::consume_detailed(uuid_token, requested_uid);
-        switch (result)
-        {
-            case login_session::consume_result::accepted:
-                ticket_accepted = true;
-                ticket_status = "accepted";
-                loaded = pPeer->load_by_uid(requested_uid);
-                break;
-            case login_session::consume_result::not_found: ticket_status = "not-found"; break;
-            case login_session::consume_result::uid_mismatch: ticket_status = "uid-mismatch"; break;
-            case login_session::consume_result::expired: ticket_status = "expired"; break;
-        }
-    }
-    else if (has_uuid_token)
-    {
-        ticket_status = "malformed";
-    }
-
-    if (!loaded && growid_field && password_field)
-    {
-        // Never trust the supplied UID: MariaDB must authenticate the account
-        // and resolve to precisely the UID sent by the client.
-        loaded = pPeer->load(requested_growid, requested_password);
-        if (loaded && has_user_id && (!user_id_valid || pPeer->user_id != requested_uid))
-            loaded = false;
-    }
-
-    if (!loaded)
-    {
-        print(std::format(
-            "[AUTH] rejected game login; uid_field={} uid_valid={} ticket_field={} ticket_numeric={} ticket_len={} ticket_status={} growid_field={} password_field={} protocol={}\n",
-            has_user_id, user_id_valid, has_uuid_token, uuid_token_valid,
-            uuid_text.size(), ticket_status, growid_field, password_field, protocol));
-        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-        enet_peer_disconnect_later(event.peer, 0);
-        return;
-    }
-
-    print(std::format("[AUTH] accepted growid={} uid={} guest={} method={} ticket_status={}\n",
-        pPeer->growid, pPeer->user_id, pPeer->is_guest,
-        ticket_accepted ? "ticket" : "credential-fallback", ticket_status));
-
-    if (admin::is_banned(pPeer->growid))
-    {
-        print(std::format("[AUTH] blocked banned account at game stage: {}\n", pPeer->growid));
-        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-        enet_peer_disconnect_later(event.peer, 0);
-        return;
-    }
-    pPeer->muted = admin::is_muted(pPeer->growid);
-
-    send_varlist(event.peer, { "OnOverrideGDPRFromServer", 18, 1, 0, 1 });
-
-    /* v5.61 */
-    send_varlist(event.peer, {
 PS C:\GTPS\Gurotopia> Get-ChildItem . -Recurse -File -Include *.cpp,*.hpp,*.h |
 >> Where-Object { $_.FullName -notmatch '\\build\\|\\\.git\\' } |
->> Select-String -Pattern 'consume_detailed|login_session|class hPipe|struct hPipe|hPipe::|uid_field|ticket_field' -Context 4,10
+>> Select-String -Pattern 'struct hPipe|class hPipe|hPipe::|consume_detailed|namespace login_session' -Context 5,12
 
-  include\action\protocol.cpp:1:#include "pch.hpp"
-  include\action\protocol.cpp:2:
-  include\action\protocol.cpp:3:#include "https/server_data.hpp"
-  include\action\protocol.cpp:4:#include "admin/admin.hpp"
-> include\action\protocol.cpp:5:#include "security/login_session.hpp"
-  include\action\protocol.cpp:6:#include "security/guest_identity.hpp"
-  include\action\protocol.cpp:7:
-  include\action\protocol.cpp:8:#include <algorithm>
-  include\action\protocol.cpp:9:#include <chrono>
-  include\action\protocol.cpp:10:#include <deque>
-  include\action\protocol.cpp:11:#include <mutex>
-  include\action\protocol.cpp:12:#include <unordered_map>
-  include\action\protocol.cpp:13:
-  include\action\protocol.cpp:14:#include <cctype>
-  include\action\protocol.cpp:15:
-  include\action\protocol.cpp:181:        return;
-  include\action\protocol.cpp:182:    }
-  include\action\protocol.cpp:183:    pPeer->muted = admin::is_muted(pPeer->growid);
-  include\action\protocol.cpp:184:
-> include\action\protocol.cpp:185:    const std::uint32_t session_token = login_session::issue(pPeer->user_id);
-  include\action\protocol.cpp:186:    if (session_token == 0)
-  include\action\protocol.cpp:187:    {
-  include\action\protocol.cpp:188:        print(std::format("[AUTH] failed to issue session ticket for uid={}\n", pPeer
-->user_id));
-  include\action\protocol.cpp:189:        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-  include\action\protocol.cpp:190:        enet_peer_disconnect_later(event.peer, 0);
-  include\action\protocol.cpp:191:        return;
-  include\action\protocol.cpp:192:    }
-  include\action\protocol.cpp:193:
-  include\action\protocol.cpp:194:    print(std::format("[AUTH] protocol stage accepted growid={} uid={} guest={} ticke
-t=issued\n",
-  include\action\protocol.cpp:195:        pPeer->growid, pPeer->user_id, guest_login));
-  include\action\tankIDName.cpp:1:#include "pch.hpp"
-  include\action\tankIDName.cpp:2:
-  include\action\tankIDName.cpp:3:#include "automate/holiday.hpp"
-  include\action\tankIDName.cpp:4:#include "admin/admin.hpp"
-> include\action\tankIDName.cpp:5:#include "security/login_session.hpp"
-  include\action\tankIDName.cpp:6:
-  include\action\tankIDName.cpp:7:#include <algorithm>
-  include\action\tankIDName.cpp:8:
-  include\action\tankIDName.cpp:9:#include <charconv>
-  include\action\tankIDName.cpp:10:#include <cctype>
-  include\action\tankIDName.cpp:11:
-  include\action\tankIDName.cpp:12:#include "tankIDName.hpp"
-  include\action\tankIDName.cpp:13:
-  include\action\tankIDName.cpp:14:namespace
-  include\action\tankIDName.cpp:15:{
+  include\action\tankIDName.cpp:121:    bool ticket_accepted = false;
   include\action\tankIDName.cpp:122:    std::string ticket_status = "not-present";
   include\action\tankIDName.cpp:123:
   include\action\tankIDName.cpp:124:    if (has_user_id && user_id_valid && has_uuid_token && uuid_token_valid)
@@ -502,45 +444,20 @@ t=issued\n",
 id);
   include\action\tankIDName.cpp:127:        switch (result)
   include\action\tankIDName.cpp:128:        {
-> include\action\tankIDName.cpp:129:            case login_session::consume_result::accepted:
+  include\action\tankIDName.cpp:129:            case login_session::consume_result::accepted:
   include\action\tankIDName.cpp:130:                ticket_accepted = true;
   include\action\tankIDName.cpp:131:                ticket_status = "accepted";
   include\action\tankIDName.cpp:132:                loaded = pPeer->load_by_uid(requested_uid);
   include\action\tankIDName.cpp:133:                break;
-> include\action\tankIDName.cpp:134:            case login_session::consume_result::not_found: ticket_status = "not-fou
+  include\action\tankIDName.cpp:134:            case login_session::consume_result::not_found: ticket_status = "not-fou
 nd"; break;
-> include\action\tankIDName.cpp:135:            case login_session::consume_result::uid_mismatch: ticket_status = "uid-
+  include\action\tankIDName.cpp:135:            case login_session::consume_result::uid_mismatch: ticket_status = "uid-
 mismatch"; break;
-> include\action\tankIDName.cpp:136:            case login_session::consume_result::expired: ticket_status = "expired";
+  include\action\tankIDName.cpp:136:            case login_session::consume_result::expired: ticket_status = "expired";
  break;
   include\action\tankIDName.cpp:137:        }
   include\action\tankIDName.cpp:138:    }
-  include\action\tankIDName.cpp:139:    else if (has_uuid_token)
-  include\action\tankIDName.cpp:140:    {
-  include\action\tankIDName.cpp:141:        ticket_status = "malformed";
-  include\action\tankIDName.cpp:142:    }
-  include\action\tankIDName.cpp:143:
-  include\action\tankIDName.cpp:144:    if (!loaded && growid_field && password_field)
-  include\action\tankIDName.cpp:145:    {
-  include\action\tankIDName.cpp:146:        // Never trust the supplied UID: MariaDB must authenticate the account
-  include\action\tankIDName.cpp:152:
-  include\action\tankIDName.cpp:153:    if (!loaded)
-  include\action\tankIDName.cpp:154:    {
-  include\action\tankIDName.cpp:155:        print(std::format(
-> include\action\tankIDName.cpp:156:            "[AUTH] rejected game login; uid_field={} uid_valid={} ticket_field={}
-ticket_numeric={} ticket_len={} ticket_status={} growid_field={} password_field={} protocol={}\n",
-  include\action\tankIDName.cpp:157:            has_user_id, user_id_valid, has_uuid_token, uuid_token_valid,
-  include\action\tankIDName.cpp:158:            uuid_text.size(), ticket_status, growid_field, password_field, protocol
-));
-  include\action\tankIDName.cpp:159:        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-  include\action\tankIDName.cpp:160:        enet_peer_disconnect_later(event.peer, 0);
-  include\action\tankIDName.cpp:161:        return;
-  include\action\tankIDName.cpp:162:    }
-  include\action\tankIDName.cpp:163:
-  include\action\tankIDName.cpp:164:    print(std::format("[AUTH] accepted growid={} uid={} guest={} method={} ticket_s
-tatus={}\n",
-  include\action\tankIDName.cpp:165:        pPeer->growid, pPeer->user_id, pPeer->is_guest,
-  include\action\tankIDName.cpp:166:        ticket_accepted ? "ticket" : "credential-fallback", ticket_status));
+  include\security\login_session.hpp:5:#include <mutex>
   include\security\login_session.hpp:6:#include <unordered_map>
   include\security\login_session.hpp:7:
   include\security\login_session.hpp:8:#include <openssl/rand.h>
@@ -556,6 +473,9 @@ tatus={}\n",
   include\security\login_session.hpp:18:    enum class consume_result
   include\security\login_session.hpp:19:    {
   include\security\login_session.hpp:20:        accepted,
+  include\security\login_session.hpp:21:        not_found,
+  include\security\login_session.hpp:22:        uid_mismatch,
+  include\security\login_session.hpp:50:            return token;
   include\security\login_session.hpp:51:        }
   include\security\login_session.hpp:52:        return 0;
   include\security\login_session.hpp:53:    }
@@ -571,6 +491,9 @@ tatus={}\n",
   include\security\login_session.hpp:63:        if (it->second.expires <= std::chrono::steady_clock::now())
   include\security\login_session.hpp:64:        {
   include\security\login_session.hpp:65:            active_tickets.erase(it);
+  include\security\login_session.hpp:66:            return consume_result::expired;
+  include\security\login_session.hpp:67:        }
+  include\security\login_session.hpp:75:        return consume_result::accepted;
   include\security\login_session.hpp:76:    }
   include\security\login_session.hpp:77:
   include\security\login_session.hpp:78:    inline bool consume(std::uint32_t token, int user_id)
@@ -578,6 +501,7 @@ tatus={}\n",
 > include\security\login_session.hpp:80:        return consume_detailed(token, user_id) == consume_result::accepted;
   include\security\login_session.hpp:81:    }
   include\security\login_session.hpp:82:}
+  include\tools\string.hpp:5:    @param c the char to search for and split
   include\tools\string.hpp:6:    @return std::vector<std::string> storing each split off from c found in the str.
   include\tools\string.hpp:7:*/
   include\tools\string.hpp:8:extern std::vector<std::string> readch(const std::string &str, char deli) ;
@@ -593,14 +517,12 @@ tatus={}\n",
   include\tools\string.hpp:18:    std::string operator[](const std::string &key) const
   include\tools\string.hpp:19:    {
   include\tools\string.hpp:20:        for (const std::pair<std::string, std::string> &pair : mPairs)
-  tests\login_session_smoke.cpp:1:#include "pch.hpp"
-> tests\login_session_smoke.cpp:2:#include "security/login_session.hpp"
-  tests\login_session_smoke.cpp:3:
-  tests\login_session_smoke.cpp:4:#include <cassert>
+  include\tools\string.hpp:21:            if (pair.first == key) return pair.second;
+  include\tools\string.hpp:22:
   tests\login_session_smoke.cpp:5:
   tests\login_session_smoke.cpp:6:int main()
   tests\login_session_smoke.cpp:7:{
-> tests\login_session_smoke.cpp:8:    const std::uint32_t token = login_session::issue(42);
+  tests\login_session_smoke.cpp:8:    const std::uint32_t token = login_session::issue(42);
   tests\login_session_smoke.cpp:9:    assert(token != 0);
 > tests\login_session_smoke.cpp:10:    assert(login_session::consume_detailed(token, 99) == login_session::consume_resu
 lt::uid_mismatch);
