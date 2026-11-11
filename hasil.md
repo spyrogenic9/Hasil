@@ -1,42 +1,74 @@
-PS C:\GTPS\Gurotopia> Get-Content .\include\action\tankIDName.cpp |
->> Select-Object -First 110
+===== A. FULL PROTOCOL HANDLER =====
+PS C:\GTPS\Gurotopia> Get-Content .\include\action\protocol.cpp |
+>>     Select-Object -First 230
 #include "pch.hpp"
 
-#include "automate/holiday.hpp"
+#include "https/server_data.hpp"
 #include "admin/admin.hpp"
 #include "security/login_session.hpp"
+#include "security/guest_identity.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <deque>
+#include <mutex>
+#include <unordered_map>
 
-#include <charconv>
 #include <cctype>
 
-#include "tankIDName.hpp"
+#include "protocol.hpp"
 
 namespace
 {
-    std::string trim_field(std::string value)
+    std::mutex guest_rate_mutex;
+    std::unordered_map<enet_uint32, std::deque<std::chrono::steady_clock::time_point>> guest_rate;
+
+    bool allow_guest_creation(const ENetPeer* peer)
     {
-        const auto is_edge_space = [](unsigned char c)
+        if (peer == nullptr) return false;
+        const auto now = std::chrono::steady_clock::now();
+        std::lock_guard lock(guest_rate_mutex);
+        const auto& ip = peer->address.host.v4;
+        const enet_uint32 ip_key =
+            (static_cast<enet_uint32>(ip[0]) << 24) |
+            (static_cast<enet_uint32>(ip[1]) << 16) |
+            (static_cast<enet_uint32>(ip[2]) << 8)  |
+            static_cast<enet_uint32>(ip[3]);
+        auto& attempts = guest_rate[ip_key];
+        while (!attempts.empty() && now - attempts.front() >= std::chrono::minutes(1))
+            attempts.pop_front();
+        if (attempts.size() >= 5) return false;
+        attempts.push_back(now);
+        return true;
+    }
+
+    std::string trim_protocol_value(std::string value)
+    {
+        const auto edge = [](unsigned char c)
         {
             return c == '\r' || c == '\n' || c == '\0' || c == ' ' || c == '\t';
         };
-        while (!value.empty() && is_edge_space(static_cast<unsigned char>(value.front())))
-            value.erase(value.begin());
-        while (!value.empty() && is_edge_space(static_cast<unsigned char>(value.back())))
-            value.pop_back();
+        while (!value.empty() && edge(static_cast<unsigned char>(value.front()))) value.erase(value.begin());
+        while (!value.empty() && edge(static_cast<unsigned char>(value.back()))) value.pop_back();
         return value;
+    }
+
+    std::string decoded_field(const std::string& decoded, const std::string& key)
+    {
+        const std::string marker = key + "=";
+        std::size_t pos = decoded.find(marker);
+        if (pos == std::string::npos) return {};
+        pos += marker.size();
+        const std::size_t end = decoded.find('&', pos);
+        return trim_protocol_value(decoded.substr(pos, end == std::string::npos ? end : end - pos));
     }
 }
 
-/* GameLogicComponent::OnInitialLogonAccepted(VariantList*) */
-void action::tankIDName(ENetEvent& event, const std::string& header)
+void action::protocol(ENetEvent& event, const std::string& header)
 {
     if (event.peer == nullptr || event.peer->data == nullptr) return;
     ::peer *pPeer = static_cast<::peer*>(event.peer->data);
 
-    // The receive layer normalizes line breaks, but some client builds send
-    // CRLF or a mixture of line and pipe separators. Normalize again here.
     std::string normalized = header;
     // receive.cpp already converts LF delimiters to '|'. Remove the CR half
     // of CRLF instead of converting it again (which would create empty fields
@@ -44,491 +76,608 @@ void action::tankIDName(ENetEvent& event, const std::string& header)
     std::erase(normalized, '\r');
     for (char& c : normalized)
         if (c == '\n') c = '|';
-
     const std::vector<std::string> fields = readch(normalized, '|');
-    if (fields.size() < 2)
-    {
-        print("[AUTH] ignored empty/short tankIDName packet\n");
-        return;
-    }
 
-    std::string protocol{};
-    std::string requested_growid{};
-    std::string requested_password{};
-    std::string uuid_text{};
-    int requested_uid{};
-    bool has_user_id = false;
-    bool user_id_valid = false;
-    bool has_uuid_token = false;
-    bool uuid_token_valid = false;
-    std::uint32_t uuid_token{};
-    bool growid_field = false;
-    bool password_field = false;
-
-    // Packet fields are key/value pairs. Step by two so an empty value
-    // (e.g. requestedName|) cannot shift the parser onto the next key.
+    std::string ltoken{};
+    std::string protocol_number{};
+    bool has_ltoken = false;
+    bool explicit_guest = false;
     for (std::size_t i = 0; i + 1 < fields.size(); i += 2)
     {
-        const std::string key = trim_field(fields[i]);
-        const std::string value = trim_field(fields[i + 1]);
-
-        if (key == "tankIDName")
+        const std::string key = trim_protocol_value(fields[i]);
+        const std::string value = trim_protocol_value(fields[i + 1]);
+        if (key == "ltoken")
         {
-            requested_growid = value;
-            growid_field = !value.empty();
+            has_ltoken = true;
+            ltoken = value;
         }
-        else if (key == "tankIDPass")
-        {
-            requested_password = value;
-            password_field = !value.empty();
-        }
-        else if (key == "protocol") protocol = value;
-        else if (key == "country") pPeer->country = value;
-        else if (key == "user")
-        {
-            has_user_id = true;
-            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), requested_uid);
-            user_id_valid = !value.empty() && parsed.ec == std::errc{} &&
-                parsed.ptr == value.data() + value.size() && requested_uid > 0;
-        }
-        else if (key == "UUIDToken")
-        {
-            has_uuid_token = true;
-            uuid_text = value;
-            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), uuid_token);
-            uuid_token_valid = !value.empty() && parsed.ec == std::errc{} &&
-                parsed.ptr == value.data() + value.size() && uuid_token != 0;
-        }
-        else if (key == "game_version")
-        {
-            try { pPeer->game_version = std::stof(value); }
-            catch (const std::logic_error&) {}
-        }
+        else if (key == "protocol") protocol_number = value;
+        else if (key == "guest" || key == "guestMode") explicit_guest = (value == "1" || value == "true");
     }
 
-    // requestedName is also routed here by legacy dispatch. It is not a
-    // complete login packet and must not cause a disconnect by itself.
-    if (protocol.empty())
+    try
     {
-PS C:\GTPS\Gurotopia> cd C:\GTPS\login-gurotopia
-PS C:\GTPS\login-gurotopia>
-PS C:\GTPS\login-gurotopia> Get-Content .\index.ts |
->> Select-Object -Skip 140 -First 165
-app.all(
-  '/player/growid/login/validate',
-  async (req: Request, res: Response) => {
-    const clientIp = getClientIp(req);
-
-    const { blocked, remaining } = checkIpBlocked(clientIp);
-    if (blocked) {
-      // @note generate error html directly
-      const clientData = '';
-      const errorMessage = 'Login attempts exhausted from your IP, Please try again later after 1 hour';
-      const templatePath = path.join(process.cwd(), 'template', 'dashboard.html');
-      const templateContent = fs.readFileSync(templatePath, 'utf-8');
-      const errorHtml = `<div class="text-danger text-danger-wrapper"><ul><li>${errorMessage}</li></ul></div>`;
-      let htmlContent = templateContent.replace('{{ data }}', Buffer.from(clientData).toString('base64'));
-      htmlContent = htmlContent.replace('<div class="row div-content-center">', `${errorHtml}<div class="row div-content-center">`);
-      res.setHeader('Content-Type', 'text/html');
-      res.send(htmlContent);
-      return;
+        if (protocol_number.empty() || std::stoi(protocol_number) <= 0)
+            throw std::runtime_error("invalid protocol");
+    }
+    catch (...)
+    {
+        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
+        return;
     }
 
-    try {
-      const formData = req.body as Record<string, string>;
-      const email = formData.email;
-      const _token = formData._token;
-      const growId = formData.growId;
-      const password = formData.password;
-      if (formData.guest === '1') {
-        if (typeof _token !== 'string' || !_token || _token.length > 16384) {
-          res.status(400).json({ status: 'error', message: 'Invalid client token' });
-          return;
-        }
-        const token = Buffer.from(`_token=${_token}&guest=1&reg=0`).toString('base64');
-        res.send(JSON.stringify({
-          status: 'success',
-          message: 'Guest session issued.',
-          token,
-          url: '',
-          accountType: 'growtopia',
-        }));
-        return;
-      }
+    bool is_registration = false;
+    bool loaded = false;
+    bool guest_login = false;
 
-      // @note registration flow when email is provided
-      if (email) {
-        const confirmPassword = formData.password_confirmation;
-        const clientData = btoa(growId || '');
-        const templatePath = path.join(process.cwd(), 'template', 'dashboard.html');
-        const templateContent = fs.readFileSync(templatePath, 'utf-8');
-
-        if (!growId || !password) {
-          const errorMessage = 'Missing GrowID or password for registration.';
-          const errorHtml = `<div class="text-danger text-danger-wrapper"><ul><li>${errorMessage}</li></ul></div>`;
-          let htmlContent = templateContent.replace('{{ data }}', Buffer.from(clientData).toString('base64'));
-          htmlContent = htmlContent.replace('<div class="row div-content-center">', `${errorHtml}<div class="row div-content-center">`);
-          res.setHeader('Content-Type', 'text/html');
-          res.send(htmlContent);
-          return;
-        }
-
-        if (confirmPassword && password !== confirmPassword) {
-          const errorMessage = 'Passwords do not match.';
-          const errorHtml = `<div class="text-danger text-danger-wrapper"><ul><li>${errorMessage}</li></ul></div>`;
-          let htmlContent = templateContent.replace('{{ data }}', Buffer.from(clientData).toString('base64'));
-          htmlContent = htmlContent.replace('<div class="row div-content-center">', `${errorHtml}<div class="row div-content-center">`);
-          res.setHeader('Content-Type', 'text/html');
-          res.send(htmlContent);
-          return;
-        }
-
-        const existing = await db`SELECT uid FROM peer WHERE growid = ${growId} LIMIT 1`;
-        if (existing.length > 0) {
-          const errorMessage = `GrowID "${growId}" is already taken. Please choose another name.`;
-          const errorHtml = `<div class="text-danger text-danger-wrapper"><ul><li>${errorMessage}</li></ul></div>`;
-          let htmlContent = templateContent.replace('{{ data }}', Buffer.from(clientData).toString('base64'));
-          htmlContent = htmlContent.replace('<div class="row div-content-center">', `${errorHtml}<div class="row div-content-center">`);
-          res.setHeader('Content-Type', 'text/html');
-          res.send(htmlContent);
-          return;
-        }
-
-        resetAttempts(clientIp);
-
-        const token = Buffer.from(
-          `_token=${_token}&growId=${growId}&password=${password}&reg=1`,
-        ).toString('base64');
-
-        res.send(
-          JSON.stringify({
-            status: 'success',
-            message: 'Account Created and Validated.',
-            token,
-            url: '',
-            accountType: 'growtopia',
-          }),
-        );
-        return;
-      }
-
-      if (!growId || !password) {
-        res.status(200).json({
-          status: 'error',
-          message: 'Missing growId or password',
-        });
-        return;
-      }
-
-      const rows = await db`SELECT * FROM peer WHERE growid = ${growId} LIMIT 1`;
-
-      if (rows.length === 0) {
-        const attemptsLeft = recordFailedAttempt(clientIp);
-        // @note generate error html directly
-        const clientData = btoa(`${growId}`);
-        const errorMessage = attemptsLeft > 0
-          ? `Account credentials missmatched. You have ${attemptsLeft} attempt(s) left.`
-          : 'Login attempts exhausted from your IP, Please try again later after 1 hour';
-        const templatePath = path.join(process.cwd(), 'template', 'dashboard.html');
-        const templateContent = fs.readFileSync(templatePath, 'utf-8');
-        const errorHtml = `<div class="text-danger text-danger-wrapper"><ul><li>${errorMessage}</li></ul></div>`;
-        let htmlContent = templateContent.replace('{{ data }}', Buffer.from(clientData).toString('base64'));
-        htmlContent = htmlContent.replace('<div class="row div-content-center">', `${errorHtml}<div class="row div-content-center">`);
-        res.setHeader('Content-Type', 'text/html');
-        res.send(htmlContent);
-        return;
-      }
-
-      const user = rows[0];
-      if (user.password !== password) {
-        const attemptsLeft = recordFailedAttempt(clientIp);
-        // @note generate error html directly
-        const clientData = btoa(`${growId}`);
-        const errorMessage = attemptsLeft > 0
-          ? `Account credentials missmatched. You have ${attemptsLeft} attempt(s) left.`
-          : 'Login attempts exhausted from your IP, Please try again later after 1 hour';
-        const templatePath = path.join(process.cwd(), 'template', 'dashboard.html');
-        const templateContent = fs.readFileSync(templatePath, 'utf-8');
-        const errorHtml = `<div class="text-danger text-danger-wrapper"><ul><li>${errorMessage}</li></ul></div>`;
-        let htmlContent = templateContent.replace('{{ data }}', Buffer.from(clientData).toString('base64'));
-        htmlContent = htmlContent.replace('<div class="row div-content-center">', `${errorHtml}<div class="row div-content-center">`);
-        res.setHeader('Content-Type', 'text/html');
-        res.send(htmlContent);
-        return;
-      }
-
-      resetAttempts(clientIp);
-
-      const token = Buffer.from(
-        `_token=${_token}&growId=${growId}&password=${password}&reg=0`,
-      ).toString('base64');
-
-      res.send(
-        JSON.stringify({
-          status: 'success',
-          message: 'Account Validated.',
-          token,
-          url: '',
-          accountType: 'growtopia',
-        }),
-      );
-    } catch (error) {
-      console.log(`[ERROR]: ${error}`);
-      res.status(500).json({
-        status: 'error',
-        message: 'Internal Server Error',
-      });
-    }
-PS C:\GTPS\login-gurotopia> Get-Content .\index.ts |
->> Select-Object -Skip 313 -First 150
-app.all('/player/growid/checktoken', async (_req: Request, res: Response) => {
-  return res.redirect(307, '/player/growid/validate/checktoken');
-});
-
-/**
- * @note second checktoken endpoint - validates token and returns updated token
- * @param req - express request with refreshToken and clientData
- * @param res - express response with updated token
- */
-app.all(
-  '/player/growid/validate/checktoken',
-  async (req: Request, res: Response) => {
-    try {
-      let refreshToken: string | undefined;
-      let clientData: string | undefined;
-      let source = 'empty';
-      const contentType = req.headers['content-type'] || '';
-
-      if (typeof req.body === 'object' && req.body !== null) {
-        const formData = req.body as Record<string, string>;
-
-        if ('refreshToken' in formData || 'clientData' in formData) {
-          refreshToken = formData.refreshToken;
-          clientData = formData.clientData;
-          source = contentType.includes('application/json')
-            ? 'json/object'
-            : 'form-urlencoded';
-        } else if (Object.keys(formData).length === 1) {
-          const rawPayload = Object.keys(formData)[0];
-          const params = new URLSearchParams(rawPayload);
-          refreshToken = params.get('refreshToken') || undefined;
-          clientData = params.get('clientData') || undefined;
-          if (refreshToken || clientData) {
-            source = 'single-key-form-payload';
-          }
-        }
-      } else if (typeof req.body === 'string' && req.body.length > 0) {
-        const params = new URLSearchParams(req.body);
-        refreshToken = params.get('refreshToken') || undefined;
-        clientData = params.get('clientData') || undefined;
-        source = 'string/body-parser';
-      }
-
-      if (
-        (!refreshToken || !clientData) &&
-        req.readable &&
-        !req.readableEnded
-      ) {
-        const rawBody = await new Promise<string>((resolve, reject) => {
-          let rawPayload = '';
-
-          req.on('data', (chunk: Buffer | string) => {
-            rawPayload += chunk.toString();
-          });
-          req.on('end', () => resolve(rawPayload));
-          req.on('error', reject);
-        });
-
-        if (rawBody) {
-          const params = new URLSearchParams(rawBody);
-          refreshToken = params.get('refreshToken') || refreshToken;
-          clientData = params.get('clientData') || clientData;
-          if (refreshToken || clientData) {
-            source = 'raw-stream';
-          }
-        }
-      }
-
-      console.log(`[CHECKTOKEN] Parsed as ${source}`);
-
-      if (!refreshToken || !clientData) {
-        console.log(`[ERROR]: Missing refreshToken or clientData`);
-        res.status(200).json({
-          status: 'error',
-          message: 'Missing refreshToken or clientData',
-        });
-        return;
-      }
-
-      let decodedRefreshToken = Buffer.from(refreshToken, 'base64').toString(
-        'utf-8',
-      );
-
-      // @note sync credentials check with db
-      const tokenParams = new URLSearchParams(decodedRefreshToken);
-      const tokenGrowId = tokenParams.get('growId');
-      const tokenPassword = tokenParams.get('password');
-      const isReg = tokenParams.get('reg') === '1';
-      console.log(`[CHECKTOKEN] parsed growId=${Boolean(tokenGrowId)} password=${Boolean(tokenPassword)} registration=${isReg}`);
-
-      if (tokenGrowId) {
-        const rows = await db`SELECT password FROM peer WHERE growid = ${tokenGrowId} LIMIT 1`;
-        console.log(`[CHECKTOKEN] accountFound=${rows.length > 0} passwordMatches=${rows.length > 0 && rows[0].password === tokenPassword}`);
-        if (isReg) {
-          if (rows.length > 0) {
-            res.status(200).json({
-              status: 'error',
-              message: 'GrowID is already taken',
-            });
+    if (!ltoken.empty())
+    {
+        const std::string decoded = base64_decode(ltoken);
+        if (decoded.empty())
+        {
+            print("[AUTH] protocol stage rejected malformed login token\n");
+            send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
             return;
-          }
-        } else if (tokenPassword) {
-          if (rows.length === 0 || rows[0].password !== tokenPassword) {
-            res.status(200).json({
-              status: 'error',
-              message: 'Invalid credentials in token',
-            });
-            return;
-          }
         }
-      }
 
-      if (!isReg && decodedRefreshToken.includes('&reg=0')) {
-        decodedRefreshToken = decodedRefreshToken.replace('&reg=0', '');
-      }
+        const std::string growid = decoded_field(decoded, "growId");
+        const std::string password = decoded_field(decoded, "password");
+        const std::string registration = decoded_field(decoded, "reg");
+        const std::string guest = decoded_field(decoded, "guest");
+        is_registration = (registration == "1");
 
-      const token = Buffer.from(
-        decodedRefreshToken.replace(
-          /(_token=)[^&]*/,
-          `$1${Buffer.from(clientData).toString('base64')}`,
-        ),
-      ).toString('base64');
-
-      res.send(
-        JSON.stringify({
-          status: 'success',
-          message: 'Account Validated.',
-          token,
-          url: '',
-          accountType: 'growtopia',
-          accountAge: 2,
-        }),
-      );
-    } catch (error) {
-      console.log(`[ERROR]: ${error}`);
-      res.status(200).json({
-        status: 'error',
-        message: 'Internal Server Error',
-      });
+        if (guest == "1" || guest == "true")
+        {
+            guest_login = true;
+            if (!allow_guest_creation(event.peer))
+            {
+                print("[AUTH] guest creation rate limit reached\n");
+                send_gameMessage(event.peer, {.message = "action|log\nmsg|`4Guest login rate limit reached. Try again shortly.``"});
+                send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
+                return;
+            }
+            const std::string client_token = decoded_field(decoded, "_token");
+            const std::string fingerprint = guest_identity::fingerprint_from_client_token(client_token);
+            loaded = pPeer->create_guest_account(fingerprint);
+        }
+        else if (growid.empty() || password.empty())
+        {
+            print("[AUTH] protocol stage rejected token without GrowID/password or guest flag\n");
+            send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
+            return;
+        }
+        else
+        {
+            loaded = is_registration
+                ? pPeer->create_account(growid, password)
+                : pPeer->load(growid, password);
+        }
     }
-  },
-);
+    else if (!has_ltoken || ltoken.empty() || explicit_guest)
+    {
+        // Guest means a new server-generated account, not an anonymous UID.
+        // A malformed, non-empty ltoken never silently downgrades into guest.
+        guest_login = true;
+        if (!allow_guest_creation(event.peer))
+        {
+            print("[AUTH] guest creation rate limit reached\n");
+            send_gameMessage(event.peer, {.message = "action|log\nmsg|`4Guest login rate limit reached. Try again shortly.``"});
+            send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
+            return;
+        }
+        loaded = pPeer->create_guest_account();
+    }
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[SERVER] Running on http://localhost:${PORT}`);
-});
+    if (!loaded)
+    {
+        print(std::format("[AUTH] protocol stage authentication failed mode={} token_present={} guest_flag={}\n",
+            ltoken.empty() ? "guest-or-empty" : "growid", has_ltoken, explicit_guest));
+        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
+        return;
+    }
 
-export default app;
-PS C:\GTPS\login-gurotopia> cd C:\GTPS\Gurotopia
+    if (admin::is_banned(pPeer->growid))
+    {
+        print(std::format("[AUTH] blocked banned account at protocol stage: {}\n", pPeer->growid));
+        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
+        enet_peer_disconnect_later(event.peer, 0);
+        return;
+    }
+    pPeer->muted = admin::is_muted(pPeer->growid);
+
+    const std::uint32_t session_token = login_session::issue(pPeer->user_id);
+    if (session_token == 0)
+    {
+        print(std::format("[AUTH] failed to issue session ticket for uid={}\n", pPeer->user_id));
+        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
+        enet_peer_disconnect_later(event.peer, 0);
+        return;
+    }
+
+    print(std::format("[AUTH] protocol stage accepted growid={} uid={} guest={} ticket=issued\n",
+        pPeer->growid, pPeer->user_id, guest_login));
+
+    send_varlist(event.peer, {
+        "OnSendToServer",
+        (signed)gServer_data.port,
+        0,
+        pPeer->user_id,
+        std::format("{}|{}|0", gServer_data.server, session_token),
+        1,
+        pPeer->growid.c_str()
+    });
+}
 PS C:\GTPS\Gurotopia>
-PS C:\GTPS\Gurotopia> Get-ChildItem . -Recurse -File -Include *.cpp,*.hpp,*.h |
->> Where-Object { $_.FullName -notmatch '\\build\\|\\\.git\\' } |
->> Select-String -Pattern 'struct hPipe|class hPipe|hPipe::|consume_detailed|namespace login_session' -Context 5,12
+PS C:\GTPS\Gurotopia> Write-Host "`n===== B. SEND_VARLIST IMPLEMENTATION ====="
 
-  include\action\tankIDName.cpp:121:    bool ticket_accepted = false;
-  include\action\tankIDName.cpp:122:    std::string ticket_status = "not-present";
-  include\action\tankIDName.cpp:123:
-  include\action\tankIDName.cpp:124:    if (has_user_id && user_id_valid && has_uuid_token && uuid_token_valid)
-  include\action\tankIDName.cpp:125:    {
-> include\action\tankIDName.cpp:126:        const auto result = login_session::consume_detailed(uuid_token, requested_u
-id);
-  include\action\tankIDName.cpp:127:        switch (result)
-  include\action\tankIDName.cpp:128:        {
-  include\action\tankIDName.cpp:129:            case login_session::consume_result::accepted:
-  include\action\tankIDName.cpp:130:                ticket_accepted = true;
-  include\action\tankIDName.cpp:131:                ticket_status = "accepted";
-  include\action\tankIDName.cpp:132:                loaded = pPeer->load_by_uid(requested_uid);
-  include\action\tankIDName.cpp:133:                break;
-  include\action\tankIDName.cpp:134:            case login_session::consume_result::not_found: ticket_status = "not-fou
-nd"; break;
-  include\action\tankIDName.cpp:135:            case login_session::consume_result::uid_mismatch: ticket_status = "uid-
-mismatch"; break;
-  include\action\tankIDName.cpp:136:            case login_session::consume_result::expired: ticket_status = "expired";
- break;
-  include\action\tankIDName.cpp:137:        }
-  include\action\tankIDName.cpp:138:    }
-  include\security\login_session.hpp:5:#include <mutex>
-  include\security\login_session.hpp:6:#include <unordered_map>
-  include\security\login_session.hpp:7:
-  include\security\login_session.hpp:8:#include <openssl/rand.h>
-  include\security\login_session.hpp:9:
-> include\security\login_session.hpp:10:namespace login_session
-  include\security\login_session.hpp:11:{
-  include\security\login_session.hpp:12:    struct ticket
-  include\security\login_session.hpp:13:    {
-  include\security\login_session.hpp:14:        int user_id{};
-  include\security\login_session.hpp:15:        std::chrono::steady_clock::time_point expires{};
-  include\security\login_session.hpp:16:    };
-  include\security\login_session.hpp:17:
-  include\security\login_session.hpp:18:    enum class consume_result
-  include\security\login_session.hpp:19:    {
-  include\security\login_session.hpp:20:        accepted,
-  include\security\login_session.hpp:21:        not_found,
-  include\security\login_session.hpp:22:        uid_mismatch,
-  include\security\login_session.hpp:50:            return token;
-  include\security\login_session.hpp:51:        }
-  include\security\login_session.hpp:52:        return 0;
-  include\security\login_session.hpp:53:    }
-  include\security\login_session.hpp:54:
-> include\security\login_session.hpp:55:    inline consume_result consume_detailed(std::uint32_t token, int user_id)
-  include\security\login_session.hpp:56:    {
-  include\security\login_session.hpp:57:        if (token == 0 || user_id <= 0) return consume_result::not_found;
-  include\security\login_session.hpp:58:
-  include\security\login_session.hpp:59:        std::lock_guard lock(ticket_mutex);
-  include\security\login_session.hpp:60:        const auto it = active_tickets.find(token);
-  include\security\login_session.hpp:61:        if (it == active_tickets.end()) return consume_result::not_found;
-  include\security\login_session.hpp:62:
-  include\security\login_session.hpp:63:        if (it->second.expires <= std::chrono::steady_clock::now())
-  include\security\login_session.hpp:64:        {
-  include\security\login_session.hpp:65:            active_tickets.erase(it);
-  include\security\login_session.hpp:66:            return consume_result::expired;
-  include\security\login_session.hpp:67:        }
-  include\security\login_session.hpp:75:        return consume_result::accepted;
-  include\security\login_session.hpp:76:    }
-  include\security\login_session.hpp:77:
-  include\security\login_session.hpp:78:    inline bool consume(std::uint32_t token, int user_id)
-  include\security\login_session.hpp:79:    {
-> include\security\login_session.hpp:80:        return consume_detailed(token, user_id) == consume_result::accepted;
-  include\security\login_session.hpp:81:    }
-  include\security\login_session.hpp:82:}
-  include\tools\string.hpp:5:    @param c the char to search for and split
-  include\tools\string.hpp:6:    @return std::vector<std::string> storing each split off from c found in the str.
-  include\tools\string.hpp:7:*/
-  include\tools\string.hpp:8:extern std::vector<std::string> readch(const std::string &str, char deli) ;
-  include\tools\string.hpp:9:
-> include\tools\string.hpp:10:struct hPipe
-  include\tools\string.hpp:11:{
-  include\tools\string.hpp:12:    hPipe(const std::string &str)
-  include\tools\string.hpp:13:    {
-  include\tools\string.hpp:14:        std::vector<std::string> pipes = readch(str, '|');
-  include\tools\string.hpp:15:        for (std::size_t i = 0; i + 1 < pipes.size(); ++i)
-  include\tools\string.hpp:16:            mPairs.emplace_back(pipes[i], pipes[i + 1]);
-  include\tools\string.hpp:17:    }
-  include\tools\string.hpp:18:    std::string operator[](const std::string &key) const
-  include\tools\string.hpp:19:    {
-  include\tools\string.hpp:20:        for (const std::pair<std::string, std::string> &pair : mPairs)
-  include\tools\string.hpp:21:            if (pair.first == key) return pair.second;
-  include\tools\string.hpp:22:
-  tests\login_session_smoke.cpp:5:
-  tests\login_session_smoke.cpp:6:int main()
-  tests\login_session_smoke.cpp:7:{
-  tests\login_session_smoke.cpp:8:    const std::uint32_t token = login_session::issue(42);
-  tests\login_session_smoke.cpp:9:    assert(token != 0);
-> tests\login_session_smoke.cpp:10:    assert(login_session::consume_detailed(token, 99) == login_session::consume_resu
-lt::uid_mismatch);
-> tests\login_session_smoke.cpp:11:    assert(login_session::consume_detailed(token, 42) == login_session::consume_resu
-lt::accepted);
-> tests\login_session_smoke.cpp:12:    assert(login_session::consume_detailed(token, 42) == login_session::consume_resu
-lt::not_found);
-  tests\login_session_smoke.cpp:13:    return 0;
-  tests\login_session_smoke.cpp:14:}
+===== B. SEND_VARLIST IMPLEMENTATION =====
+PS C:\GTPS\Gurotopia> Get-ChildItem . -Recurse -File -Include *.cpp,*.hpp,*.h |
+>>     Where-Object {
+>>         $_.FullName -notmatch '\\build\\|\\.git\\'
+>>     } |
+>>     Select-String -Pattern 'send_varlist\s*\(' -Context 8,18 |
+>>     Format-List Path,LineNumber,Context
+
+
+Path       : C:\GTPS\Gurotopia\include\action\dialog_return\popup.cpp
+LineNumber : 25
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\dialog_return\popup.cpp
+LineNumber : 50
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\dialog_return\popup.cpp
+LineNumber : 79
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\dialog_return\popup.cpp
+LineNumber : 90
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\dialog_return\socialportal.cpp
+LineNumber : 11
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\buy.cpp
+LineNumber : 69
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\buy.cpp
+LineNumber : 82
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\buy.cpp
+LineNumber : 136
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\drop.cpp
+LineNumber : 15
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\drop.cpp
+LineNumber : 23
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
+LineNumber : 25
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
+LineNumber : 33
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
+LineNumber : 34
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
+LineNumber : 38
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
+LineNumber : 47
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
+LineNumber : 55
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\friends.cpp
+LineNumber : 9
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\info.cpp
+LineNumber : 53
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\input.cpp
+LineNumber : 67
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\inventoryfavuitrigger.cpp
+LineNumber : 9
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\itemfavourite.cpp
+LineNumber : 19
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\itemfavourite.cpp
+LineNumber : 23
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
+LineNumber : 38
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
+LineNumber : 111
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
+LineNumber : 131
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
+LineNumber : 147
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
+LineNumber : 155
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
+LineNumber : 161
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\mod_trade.cpp
+LineNumber : 18
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\protocol.cpp
+LineNumber : 197
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\quit_to_exit.cpp
+LineNumber : 24
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\respawn.cpp
+LineNumber : 9
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\respawn.cpp
+LineNumber : 10
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\respawn.cpp
+LineNumber : 14
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\respawn.cpp
+LineNumber : 16
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\respawn_spike.cpp
+LineNumber : 11
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\respawn_spike.cpp
+LineNumber : 13
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\store.cpp
+LineNumber : 13
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\tankIDName.cpp
+LineNumber : 222
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\tankIDName.cpp
+LineNumber : 225
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\trash.cpp
+LineNumber : 15
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\trash.cpp
+LineNumber : 25
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\worldlock_storage_modify_amount.cpp
+LineNumber : 46
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\worldlock_storage_modify_amount.cpp
+LineNumber : 51
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\wrench.cpp
+LineNumber : 24
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\action\wrench.cpp
+LineNumber : 80
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\admin\admin.cpp
+LineNumber : 270
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\admin\admin.cpp
+LineNumber : 363
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\commands\find.cpp
+LineNumber : 17
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\commands\me.cpp
+LineNumber : 15
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\commands\warp.cpp
+LineNumber : 14
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\commands\weather.cpp
+LineNumber : 81
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\commands\who.cpp
+LineNumber : 16
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\database\peer.cpp
+LineNumber : 348
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\database\peer.cpp
+LineNumber : 349
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\database\peer.cpp
+LineNumber : 352
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\item_activate.cpp
+LineNumber : 27
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\item_activate.cpp
+LineNumber : 42
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\item_activate.cpp
+LineNumber : 54
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\movement.cpp
+LineNumber : 51
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_activate.cpp
+LineNumber : 48
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_activate.cpp
+LineNumber : 52
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_activate.cpp
+LineNumber : 57
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 59
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 140
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 232
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 365
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 387
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 427
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 441
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 455
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 466
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 563
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 604
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 631
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 649
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 670
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 714
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 783
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
+LineNumber : 838
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\Action.cpp
+LineNumber : 19
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\BillboardChange.cpp
+LineNumber : 9
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\ConsoleMessage.cpp
+LineNumber : 7
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\CountryState.cpp
+LineNumber : 9
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\EmoticonDataChanged.cpp
+LineNumber : 29
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\EventButtonDataSet.cpp
+LineNumber : 7
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\NameChanged.cpp
+LineNumber : 9
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\RequestGazette.cpp
+LineNumber : 48
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\RequestWorldSelectMenu.cpp
+LineNumber : 29
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\SetBux.cpp
+LineNumber : 16
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\SetBux.cpp
+LineNumber : 27
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\SetClothing.cpp
+LineNumber : 9
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\Spawn.cpp
+LineNumber : 7
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\TradeStatus.cpp
+LineNumber : 14
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\onVariant\WorldLockStorageResponse.cpp
+LineNumber : 20
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\proton\Variant.cpp
+LineNumber : 115
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+Path       : C:\GTPS\Gurotopia\include\proton\Variant.hpp
+LineNumber : 196
+Context    : Microsoft.PowerShell.Commands.MatchInfoContext
+
+
+
+PS C:\GTPS\Gurotopia>
+PS C:\GTPS\Gurotopia> Write-Host "`n===== C. VARIANT LIST STRUCTURE ====="
+
+===== C. VARIANT LIST STRUCTURE =====
+PS C:\GTPS\Gurotopia> Get-Content .\include\proton\Variant.hpp |
+>>     Select-Object -Skip 130 -First 100
+        void SetDefaults()
+        {
+                m_type = TYPE_UNUSED;
+        }
+        eType m_type;
+
+        union
+        {
+                u_char m_var[C_VAR_SPACE_BYTES]; //large enough so we can use the space for all the datatypes we care about
+
+                //don't actually use these, these unions help me look at vars when debugging easier
+                float m_as_floats[4];
+                u_int m_as_uint32s[4];
+                int m_as_int32s[4];
+        };
+        std::string m_string;
+
+};
+
+//a VariantList holds a group of variants, we pass these when we don't know in advance how many variants we want to use
+
+#define C_MAX_VARIANT_LIST_PARMS 8
+
+/*
+//example of memory serialization of a VariantList
+
+VariantList v;
+v.Get(0).Set(uint32(42));
+v.Get(1).Set("Hey guys");
+
+//save to mem
+byte *pData = v.SerializeToMem(&size, NULL);
+
+//load from mem
+VariantList b;
+b.SerializeFromMem(pData, size);
+
+//display
+LogMsg("%s, the answer to life is %d", b.Get(1).GetString().c_str(), b.Get(0).GetUINT32());
+
+//clean up the mem we initted earlier
+SAFE_DELETE_ARRAY(pData);
+*/
+
+class VariantList
+{
+        public:
+
+                VariantList(){};
+
+                Variant & Get(int parmNum) {return m_variant[parmNum];}
+                VariantList(Variant v0) {m_variant[0] = v0;}
+                VariantList(Variant v0, Variant v1) {m_variant[0] = v0; m_variant[1] = v1;}
+                VariantList(Variant v0, Variant v1, Variant v2) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2;}
+                VariantList(Variant v0, Variant v1, Variant v2, Variant v3) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2; m_variant[3] = v3;}
+                VariantList(Variant v0, Variant v1, Variant v2, Variant v3, Variant v4) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2; m_variant[3] = v3; m_variant[4] = v4;}
+                VariantList(Variant v0, Variant v1, Variant v2, Variant v3, Variant v4, Variant v5) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2; m_variant[3] = v3; m_variant[4] = v4;  m_variant[5] = v5;}
+                VariantList(Variant v0, Variant v1, Variant v2, Variant v3, Variant v4, Variant v5, Variant v6) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2; m_variant[3] = v3; m_variant[4] = v4;  m_variant[5] = v5; m_variant[6] = v6;}
+
+                u_char * SerializeToMem(u_int *pSizeOut, u_char *pDest); //pass in NULL for dest and it will new[] the memory itself
+                Variant m_variant[C_MAX_VARIANT_LIST_PARMS]; //non-dynamic for speed
+};
+
+int GetSizeOfData(Variant::eType type);
+
+void send_varlist(ENetPeer *peer, VariantList vlist, int netid = -1, int delay = 0);
