@@ -1,683 +1,481 @@
-===== A. FULL PROTOCOL HANDLER =====
-PS C:\GTPS\Gurotopia> Get-Content .\include\action\protocol.cpp |
->>     Select-Object -First 230
-#include "pch.hpp"
-
-#include "https/server_data.hpp"
-#include "admin/admin.hpp"
-#include "security/login_session.hpp"
-#include "security/guest_identity.hpp"
-
-#include <algorithm>
-#include <chrono>
-#include <deque>
-#include <mutex>
-#include <unordered_map>
-
-#include <cctype>
-
-#include "protocol.hpp"
-
-namespace
-{
-    std::mutex guest_rate_mutex;
-    std::unordered_map<enet_uint32, std::deque<std::chrono::steady_clock::time_point>> guest_rate;
-
-    bool allow_guest_creation(const ENetPeer* peer)
-    {
-        if (peer == nullptr) return false;
-        const auto now = std::chrono::steady_clock::now();
-        std::lock_guard lock(guest_rate_mutex);
-        const auto& ip = peer->address.host.v4;
-        const enet_uint32 ip_key =
-            (static_cast<enet_uint32>(ip[0]) << 24) |
-            (static_cast<enet_uint32>(ip[1]) << 16) |
-            (static_cast<enet_uint32>(ip[2]) << 8)  |
-            static_cast<enet_uint32>(ip[3]);
-        auto& attempts = guest_rate[ip_key];
-        while (!attempts.empty() && now - attempts.front() >= std::chrono::minutes(1))
-            attempts.pop_front();
-        if (attempts.size() >= 5) return false;
-        attempts.push_back(now);
-        return true;
-    }
-
-    std::string trim_protocol_value(std::string value)
-    {
-        const auto edge = [](unsigned char c)
-        {
-            return c == '\r' || c == '\n' || c == '\0' || c == ' ' || c == '\t';
-        };
-        while (!value.empty() && edge(static_cast<unsigned char>(value.front()))) value.erase(value.begin());
-        while (!value.empty() && edge(static_cast<unsigned char>(value.back()))) value.pop_back();
-        return value;
-    }
-
-    std::string decoded_field(const std::string& decoded, const std::string& key)
-    {
-        const std::string marker = key + "=";
-        std::size_t pos = decoded.find(marker);
-        if (pos == std::string::npos) return {};
-        pos += marker.size();
-        const std::size_t end = decoded.find('&', pos);
-        return trim_protocol_value(decoded.substr(pos, end == std::string::npos ? end : end - pos));
-    }
-}
-
-void action::protocol(ENetEvent& event, const std::string& header)
-{
-    if (event.peer == nullptr || event.peer->data == nullptr) return;
-    ::peer *pPeer = static_cast<::peer*>(event.peer->data);
-
-    std::string normalized = header;
-    // receive.cpp already converts LF delimiters to '|'. Remove the CR half
-    // of CRLF instead of converting it again (which would create empty fields
-    // and shift every key/value pair by one position).
-    std::erase(normalized, '\r');
-    for (char& c : normalized)
-        if (c == '\n') c = '|';
-    const std::vector<std::string> fields = readch(normalized, '|');
-
-    std::string ltoken{};
-    std::string protocol_number{};
-    bool has_ltoken = false;
-    bool explicit_guest = false;
-    for (std::size_t i = 0; i + 1 < fields.size(); i += 2)
-    {
-        const std::string key = trim_protocol_value(fields[i]);
-        const std::string value = trim_protocol_value(fields[i + 1]);
-        if (key == "ltoken")
-        {
-            has_ltoken = true;
-            ltoken = value;
-        }
-        else if (key == "protocol") protocol_number = value;
-        else if (key == "guest" || key == "guestMode") explicit_guest = (value == "1" || value == "true");
-    }
-
-    try
-    {
-        if (protocol_number.empty() || std::stoi(protocol_number) <= 0)
-            throw std::runtime_error("invalid protocol");
-    }
-    catch (...)
-    {
-        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-        return;
-    }
-
-    bool is_registration = false;
-    bool loaded = false;
-    bool guest_login = false;
-
-    if (!ltoken.empty())
-    {
-        const std::string decoded = base64_decode(ltoken);
-        if (decoded.empty())
-        {
-            print("[AUTH] protocol stage rejected malformed login token\n");
-            send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-            return;
-        }
-
-        const std::string growid = decoded_field(decoded, "growId");
-        const std::string password = decoded_field(decoded, "password");
-        const std::string registration = decoded_field(decoded, "reg");
-        const std::string guest = decoded_field(decoded, "guest");
-        is_registration = (registration == "1");
-
-        if (guest == "1" || guest == "true")
-        {
-            guest_login = true;
-            if (!allow_guest_creation(event.peer))
-            {
-                print("[AUTH] guest creation rate limit reached\n");
-                send_gameMessage(event.peer, {.message = "action|log\nmsg|`4Guest login rate limit reached. Try again shortly.``"});
-                send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-                return;
-            }
-            const std::string client_token = decoded_field(decoded, "_token");
-            const std::string fingerprint = guest_identity::fingerprint_from_client_token(client_token);
-            loaded = pPeer->create_guest_account(fingerprint);
-        }
-        else if (growid.empty() || password.empty())
-        {
-            print("[AUTH] protocol stage rejected token without GrowID/password or guest flag\n");
-            send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-            return;
-        }
-        else
-        {
-            loaded = is_registration
-                ? pPeer->create_account(growid, password)
-                : pPeer->load(growid, password);
-        }
-    }
-    else if (!has_ltoken || ltoken.empty() || explicit_guest)
-    {
-        // Guest means a new server-generated account, not an anonymous UID.
-        // A malformed, non-empty ltoken never silently downgrades into guest.
-        guest_login = true;
-        if (!allow_guest_creation(event.peer))
-        {
-            print("[AUTH] guest creation rate limit reached\n");
-            send_gameMessage(event.peer, {.message = "action|log\nmsg|`4Guest login rate limit reached. Try again shortly.``"});
-            send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-            return;
-        }
-        loaded = pPeer->create_guest_account();
-    }
-
-    if (!loaded)
-    {
-        print(std::format("[AUTH] protocol stage authentication failed mode={} token_present={} guest_flag={}\n",
-            ltoken.empty() ? "guest-or-empty" : "growid", has_ltoken, explicit_guest));
-        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-        return;
-    }
-
-    if (admin::is_banned(pPeer->growid))
-    {
-        print(std::format("[AUTH] blocked banned account at protocol stage: {}\n", pPeer->growid));
-        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-        enet_peer_disconnect_later(event.peer, 0);
-        return;
-    }
-    pPeer->muted = admin::is_muted(pPeer->growid);
-
-    const std::uint32_t session_token = login_session::issue(pPeer->user_id);
-    if (session_token == 0)
-    {
-        print(std::format("[AUTH] failed to issue session ticket for uid={}\n", pPeer->user_id));
-        send_gameMessage(event.peer, {.message = "action|logon_fail\n"});
-        enet_peer_disconnect_later(event.peer, 0);
-        return;
-    }
-
-    print(std::format("[AUTH] protocol stage accepted growid={} uid={} guest={} ticket=issued\n",
-        pPeer->growid, pPeer->user_id, guest_login));
-
-    send_varlist(event.peer, {
-        "OnSendToServer",
-        (signed)gServer_data.port,
-        0,
-        pPeer->user_id,
-        std::format("{}|{}|0", gServer_data.server, session_token),
-        1,
-        pPeer->growid.c_str()
-    });
-}
-PS C:\GTPS\Gurotopia>
-PS C:\GTPS\Gurotopia> Write-Host "`n===== B. SEND_VARLIST IMPLEMENTATION ====="
-
-===== B. SEND_VARLIST IMPLEMENTATION =====
-PS C:\GTPS\Gurotopia> Get-ChildItem . -Recurse -File -Include *.cpp,*.hpp,*.h |
->>     Where-Object {
->>         $_.FullName -notmatch '\\build\\|\\.git\\'
->>     } |
->>     Select-String -Pattern 'send_varlist\s*\(' -Context 8,18 |
->>     Format-List Path,LineNumber,Context
-
-
-Path       : C:\GTPS\Gurotopia\include\action\dialog_return\popup.cpp
-LineNumber : 25
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\dialog_return\popup.cpp
-LineNumber : 50
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\dialog_return\popup.cpp
-LineNumber : 79
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\dialog_return\popup.cpp
-LineNumber : 90
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\dialog_return\socialportal.cpp
-LineNumber : 11
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\buy.cpp
-LineNumber : 69
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\buy.cpp
-LineNumber : 82
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\buy.cpp
-LineNumber : 136
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\drop.cpp
-LineNumber : 15
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\drop.cpp
-LineNumber : 23
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
-LineNumber : 25
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
-LineNumber : 33
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
-LineNumber : 34
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
-LineNumber : 38
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
-LineNumber : 47
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\enter_game.cpp
-LineNumber : 55
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\friends.cpp
-LineNumber : 9
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\info.cpp
-LineNumber : 53
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\input.cpp
-LineNumber : 67
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\inventoryfavuitrigger.cpp
-LineNumber : 9
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\itemfavourite.cpp
-LineNumber : 19
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\itemfavourite.cpp
-LineNumber : 23
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
-LineNumber : 38
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
-LineNumber : 111
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
-LineNumber : 131
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
-LineNumber : 147
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
-LineNumber : 155
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\join_request.cpp
-LineNumber : 161
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\mod_trade.cpp
-LineNumber : 18
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\protocol.cpp
-LineNumber : 197
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\quit_to_exit.cpp
-LineNumber : 24
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\respawn.cpp
-LineNumber : 9
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\respawn.cpp
-LineNumber : 10
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\respawn.cpp
-LineNumber : 14
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\respawn.cpp
-LineNumber : 16
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\respawn_spike.cpp
-LineNumber : 11
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\respawn_spike.cpp
-LineNumber : 13
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\store.cpp
-LineNumber : 13
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\tankIDName.cpp
-LineNumber : 222
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\tankIDName.cpp
-LineNumber : 225
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\trash.cpp
-LineNumber : 15
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\trash.cpp
-LineNumber : 25
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\worldlock_storage_modify_amount.cpp
-LineNumber : 46
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\worldlock_storage_modify_amount.cpp
-LineNumber : 51
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\wrench.cpp
-LineNumber : 24
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\action\wrench.cpp
-LineNumber : 80
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\admin\admin.cpp
-LineNumber : 270
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\admin\admin.cpp
-LineNumber : 363
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\commands\find.cpp
-LineNumber : 17
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\commands\me.cpp
-LineNumber : 15
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\commands\warp.cpp
-LineNumber : 14
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\commands\weather.cpp
-LineNumber : 81
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\commands\who.cpp
-LineNumber : 16
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\database\peer.cpp
-LineNumber : 348
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\database\peer.cpp
-LineNumber : 349
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\database\peer.cpp
-LineNumber : 352
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\item_activate.cpp
-LineNumber : 27
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\item_activate.cpp
-LineNumber : 42
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\item_activate.cpp
-LineNumber : 54
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\movement.cpp
-LineNumber : 51
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_activate.cpp
-LineNumber : 48
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_activate.cpp
-LineNumber : 52
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_activate.cpp
-LineNumber : 57
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 59
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 140
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 232
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 365
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 387
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 427
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 441
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 455
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 466
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 563
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 604
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 631
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 649
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 670
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 714
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 783
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\gamePacket\tile_change.cpp
-LineNumber : 838
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\Action.cpp
-LineNumber : 19
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\BillboardChange.cpp
-LineNumber : 9
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\ConsoleMessage.cpp
-LineNumber : 7
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\CountryState.cpp
-LineNumber : 9
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\EmoticonDataChanged.cpp
-LineNumber : 29
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\EventButtonDataSet.cpp
-LineNumber : 7
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\NameChanged.cpp
-LineNumber : 9
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\RequestGazette.cpp
-LineNumber : 48
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\RequestWorldSelectMenu.cpp
-LineNumber : 29
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\SetBux.cpp
-LineNumber : 16
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\SetBux.cpp
-LineNumber : 27
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\SetClothing.cpp
-LineNumber : 9
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\Spawn.cpp
-LineNumber : 7
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\TradeStatus.cpp
-LineNumber : 14
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\onVariant\WorldLockStorageResponse.cpp
-LineNumber : 20
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\proton\Variant.cpp
-LineNumber : 115
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-Path       : C:\GTPS\Gurotopia\include\proton\Variant.hpp
-LineNumber : 196
-Context    : Microsoft.PowerShell.Commands.MatchInfoContext
-
-
-
-PS C:\GTPS\Gurotopia>
-PS C:\GTPS\Gurotopia> Write-Host "`n===== C. VARIANT LIST STRUCTURE ====="
-
-===== C. VARIANT LIST STRUCTURE =====
-PS C:\GTPS\Gurotopia> Get-Content .\include\proton\Variant.hpp |
->>     Select-Object -Skip 130 -First 100
-        void SetDefaults()
-        {
-                m_type = TYPE_UNUSED;
-        }
-        eType m_type;
-
-        union
-        {
-                u_char m_var[C_VAR_SPACE_BYTES]; //large enough so we can use the space for all the datatypes we care about
-
-                //don't actually use these, these unions help me look at vars when debugging easier
-                float m_as_floats[4];
-                u_int m_as_uint32s[4];
-                int m_as_int32s[4];
-        };
-        std::string m_string;
-
-};
-
-//a VariantList holds a group of variants, we pass these when we don't know in advance how many variants we want to use
-
-#define C_MAX_VARIANT_LIST_PARMS 8
-
-/*
-//example of memory serialization of a VariantList
-
-VariantList v;
-v.Get(0).Set(uint32(42));
-v.Get(1).Set("Hey guys");
-
-//save to mem
-byte *pData = v.SerializeToMem(&size, NULL);
-
-//load from mem
-VariantList b;
-b.SerializeFromMem(pData, size);
-
-//display
-LogMsg("%s, the answer to life is %d", b.Get(1).GetString().c_str(), b.Get(0).GetUINT32());
-
-//clean up the mem we initted earlier
-SAFE_DELETE_ARRAY(pData);
-*/
-
-class VariantList
-{
-        public:
-
-                VariantList(){};
-
-                Variant & Get(int parmNum) {return m_variant[parmNum];}
-                VariantList(Variant v0) {m_variant[0] = v0;}
-                VariantList(Variant v0, Variant v1) {m_variant[0] = v0; m_variant[1] = v1;}
-                VariantList(Variant v0, Variant v1, Variant v2) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2;}
-                VariantList(Variant v0, Variant v1, Variant v2, Variant v3) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2; m_variant[3] = v3;}
-                VariantList(Variant v0, Variant v1, Variant v2, Variant v3, Variant v4) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2; m_variant[3] = v3; m_variant[4] = v4;}
-                VariantList(Variant v0, Variant v1, Variant v2, Variant v3, Variant v4, Variant v5) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2; m_variant[3] = v3; m_variant[4] = v4;  m_variant[5] = v5;}
-                VariantList(Variant v0, Variant v1, Variant v2, Variant v3, Variant v4, Variant v5, Variant v6) {m_variant[0] = v0; m_variant[1] = v1; m_variant[2] = v2; m_variant[3] = v3; m_variant[4] = v4;  m_variant[5] = v5; m_variant[6] = v6;}
-
-                u_char * SerializeToMem(u_int *pSizeOut, u_char *pDest); //pass in NULL for dest and it will new[] the memory itself
-                Variant m_variant[C_MAX_VARIANT_LIST_PARMS]; //non-dynamic for speed
-};
-
-int GetSizeOfData(Variant::eType type);
-
-void send_varlist(ENetPeer *peer, VariantList vlist, int netid = -1, int delay = 0);
+PS C:\WINDOWS\system32> Write-Host "`n===== SERVER DATA YANG DITERIMA CLIENT ====="
+>>
+>> curl.exe -sk --http1.1 `
+>>     --resolve www.growtopia1.com:443:127.0.0.1 `
+>>     -H "Content-Type: application/x-www-form-urlencoded" `
+>>     --data "version=5.61&protocol=227" `
+>>     https://www.growtopia1.com/growtopia/server_data.php |
+>>     Select-String '^(server|port|type|type2|loginurl|meta)\|'
+>>
+>> Write-Host "`n===== TCP LISTENERS ====="
+>>
+>> Get-NetTCPConnection -State Listen |
+>>     Where-Object LocalPort -in 80,443,3000,8443 |
+>>     Format-Table LocalAddress,LocalPort,OwningProcess -AutoSize
+>>
+>> Write-Host "`n===== GAME UDP LISTENER ====="
+>>
+>> Get-NetUDPEndpoint -LocalPort 17091 |
+>>     Format-Table LocalAddress,LocalPort,OwningProcess -AutoSize
+
+===== SERVER DATA YANG DITERIMA CLIENT =====
+
+server|127.0.0.1
+port|17091
+type|1
+type2|1
+loginurl|www.growtopia1.com
+meta|gurotopia
+
+===== TCP LISTENERS =====
+
+
+
+LocalAddress LocalPort OwningProcess
+------------ --------- -------------
+127.0.0.1         8443         13988
+127.0.0.1         3000          9960
+127.0.0.1          443          4720
+127.0.0.1           80          4720
+
+
+
+===== GAME UDP LISTENER =====
+
+LocalAddress LocalPort OwningProcess
+------------ --------- -------------
+0.0.0.0          17091         13988
+
+
+PS C:\WINDOWS\system32> Write-Host "`n===== RESET PAKET MONITOR ====="
+>>
+>> pktmon stop
+>> pktmon filter remove
+>>
+>> Write-Host "`n===== PASANG FILTER PORT ====="
+>>
+>> pktmon filter add -p 80
+>> pktmon filter add -p 443
+>> pktmon filter add -p 3000
+>> pktmon filter add -p 8443
+>> pktmon filter add -p 17091
+>>
+>> pktmon filter list
+>>
+>> Write-Host "`n===== MULAI CAPTURE ====="
+>>
+>> pktmon start --capture --file-name C:\GTPS\GTPS-connection.etl
+
+===== RESET PAKET MONITOR =====
+Packet Monitor is not running.
+Removed all filters.
+
+===== PASANG FILTER PORT =====
+Filter added.
+Filter added.
+Filter added.
+Filter added.
+Filter added.
+Packet Filters:
+     # Name     Port
+     - ----     ----
+     1 <empty>    80
+     2 <empty>   443
+     3 <empty>  3000
+     4 <empty>  8443
+     5 <empty> 17091
+
+===== MULAI CAPTURE =====
+
+Logger Parameters:
+    Logger name:        PktMon
+    Logging mode:       Circular
+    Log file:           C:\GTPS\GTPS-connection.etl
+    Max file size:      512 MB
+    Memory used:        128 MB
+
+Collected Data:
+    Packet counters, packet capture
+
+Capture Type:
+    All packets
+
+Monitored Components:
+    All
+
+Packet Filters:
+     # Name     Port
+     - ----     ----
+     1 <empty>    80
+     2 <empty>   443
+     3 <empty>  3000
+     4 <empty>  8443
+     5 <empty> 17091
+PS C:\WINDOWS\system32> Write-Host "`n===== PACKET COUNTERS ====="
+>> pktmon counters
+>>
+>> Write-Host "`n===== STOP CAPTURE ====="
+>> pktmon stop
+>>
+>> Write-Host "`n===== CONVERT CAPTURE ====="
+>> pktmon etl2txt C:\GTPS\GTPS-connection.etl `
+>>     --out C:\GTPS\GTPS-connection.txt `
+>>     --brief
+>>
+>> Write-Host "`n===== FILTER KONEKSI GAME DAN DROP ====="
+>> Select-String `
+>>     -Path C:\GTPS\GTPS-connection.txt `
+>>     -Pattern '17091|8443|3000|443|drop|Drop' |
+>>     Select-Object -First 160
+
+===== PACKET COUNTERS =====
+
+NIC: Realtek PCIe GbE Family Controller
+ Id Name                       Counter  Direction     Packets          Bytes | Direction     Packets          Bytes
+ -- ----                       -------  ---------     -------          ----- | ---------     -------          -----
+ 14 Realtek PCIe GbE Family... Lower    Rx             26.198     30.793.257 | Tx              4.598        848.570
+  1 Realtek PCIe GbE Family... Upper    Rx             43.700     51.697.272 | Tx              4.250        685.032
+                                                                             |
+  4 WFP Native Filter          Lower    Rx             43.700     51.697.272 | Tx              4.244        684.588
+                               Upper    Rx             43.700     51.697.272 | Tx              4.244        684.588
+  3 QoS Packet Scheduler       Lower    Rx                  0              0 | Tx              4.244        684.588
+                               Upper    Rx                  0              0 | Tx              4.244        684.588
+                                                                             |
+  5 TCPIP6                     Lower    Rx             43.668     51.682.872 | Tx              4.229        683.095
+  6 TCPIP                      Lower    Rx                 32         14.400 | Tx                 15          1.493
+
+
+===== STOP CAPTURE =====
+Flushing logs...
+Merging metadata...
+Log file: C:\GTPS\GTPS-connection.etl (No events lost)
+
+===== CONVERT CAPTURE =====
+Processing...
+
+Events formatted:    161206
+Formatted file:      C:\GTPS\GTPS-connection.txt
+
+===== FILTER KONEKSI GAME DAN DROP =====
+
+C:\GTPS\GTPS-connection.txt:5:  2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 97: 2404:8000:1122:7c1:b95d:74ab:15a
+d:87df.55645 > 2404:8000:12:14::e.443: UDP, length 35
+C:\GTPS\GTPS-connection.txt:7:  2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 97: 2404:8000:1122:7c1:b95d:74ab:15a
+d:87df.55645 > 2404:8000:12:14::e.443: UDP, length 35
+C:\GTPS\GTPS-connection.txt:9:  2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 97: 2404:8000:1122:7c1:b95d:74ab:15a
+d:87df.55645 > 2404:8000:12:14::e.443: UDP, length 35
+C:\GTPS\GTPS-connection.txt:11: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 97: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 35
+C:\GTPS\GTPS-connection.txt:13: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 97: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 35
+C:\GTPS\GTPS-connection.txt:15: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 97: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 35
+C:\GTPS\GTPS-connection.txt:17: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 97: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 35
+C:\GTPS\GTPS-connection.txt:19: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 310: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 248
+C:\GTPS\GTPS-connection.txt:21: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 310: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 248
+C:\GTPS\GTPS-connection.txt:23: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 310: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 248
+C:\GTPS\GTPS-connection.txt:25: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 310: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 248
+C:\GTPS\GTPS-connection.txt:27: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 310: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 248
+C:\GTPS\GTPS-connection.txt:29: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 93: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 31
+C:\GTPS\GTPS-connection.txt:31: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:33: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 93: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 31
+C:\GTPS\GTPS-connection.txt:35: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:37: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 93: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 31
+C:\GTPS\GTPS-connection.txt:39: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:41: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 93: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 31
+C:\GTPS\GTPS-connection.txt:43: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:45: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 93: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 31
+C:\GTPS\GTPS-connection.txt:47: 30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:8
+000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:49: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:51: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:53: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:55: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:57: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:59: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:61: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:15
+ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:63: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1083: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1021
+C:\GTPS\GTPS-connection.txt:65: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1083: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1021
+C:\GTPS\GTPS-connection.txt:67: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1083: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1021
+C:\GTPS\GTPS-connection.txt:69: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1083: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1021
+C:\GTPS\GTPS-connection.txt:71: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1083: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1021
+C:\GTPS\GTPS-connection.txt:73: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1083: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1021
+C:\GTPS\GTPS-connection.txt:75: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1083: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1021
+C:\GTPS\GTPS-connection.txt:77: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1287: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1225
+C:\GTPS\GTPS-connection.txt:79: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1287: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1225
+C:\GTPS\GTPS-connection.txt:81: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1287: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1225
+C:\GTPS\GTPS-connection.txt:83: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1287: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1225
+C:\GTPS\GTPS-connection.txt:85: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1287: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1225
+C:\GTPS\GTPS-connection.txt:87: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1287: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1225
+C:\GTPS\GTPS-connection.txt:89: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1287: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 1225
+C:\GTPS\GTPS-connection.txt:91: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 552: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 490
+C:\GTPS\GTPS-connection.txt:93: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 552: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 490
+C:\GTPS\GTPS-connection.txt:95: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 552: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 490
+C:\GTPS\GTPS-connection.txt:97: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 552: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 490
+C:\GTPS\GTPS-connection.txt:99: 2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 552: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 490
+C:\GTPS\GTPS-connection.txt:101:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 552: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 490
+C:\GTPS\GTPS-connection.txt:103:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 552: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 490
+C:\GTPS\GTPS-connection.txt:105:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 204: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 142
+C:\GTPS\GTPS-connection.txt:107:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 204: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 142
+C:\GTPS\GTPS-connection.txt:109:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 204: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 142
+C:\GTPS\GTPS-connection.txt:111:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 204: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 142
+C:\GTPS\GTPS-connection.txt:113:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 204: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 142
+C:\GTPS\GTPS-connection.txt:115:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 104: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 42
+C:\GTPS\GTPS-connection.txt:117:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 104: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 42
+C:\GTPS\GTPS-connection.txt:119:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 104: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 42
+C:\GTPS\GTPS-connection.txt:121:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 104: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 42
+C:\GTPS\GTPS-connection.txt:123:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 104: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 42
+C:\GTPS\GTPS-connection.txt:125:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 104: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 42
+C:\GTPS\GTPS-connection.txt:127:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 104: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 42
+C:\GTPS\GTPS-connection.txt:129:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:131:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:133:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:135:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:137:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 88: 2404:8000:12:14::e.443 > 2404:
+8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 26
+C:\GTPS\GTPS-connection.txt:139:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 408: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 346
+C:\GTPS\GTPS-connection.txt:141:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 408: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 346
+C:\GTPS\GTPS-connection.txt:143:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 408: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 346
+C:\GTPS\GTPS-connection.txt:145:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 408: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 346
+C:\GTPS\GTPS-connection.txt:147:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 408: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 346
+C:\GTPS\GTPS-connection.txt:149:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 408: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 346
+C:\GTPS\GTPS-connection.txt:151:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 408: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 346
+C:\GTPS\GTPS-connection.txt:153:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1286: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:155:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1286: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:157:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1286: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:159:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1286: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:161:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1286: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:163:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1286: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:165:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1286: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:167:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1292: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:169:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1292: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:171:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1292: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:173:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1292: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:175:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1292: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:177:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1292: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:179:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 1292: 2404:8000:1122:7c1:b95d:74ab
+:15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:181:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 937: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 875
+C:\GTPS\GTPS-connection.txt:183:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 937: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 875
+C:\GTPS\GTPS-connection.txt:185:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 937: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 875
+C:\GTPS\GTPS-connection.txt:187:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 937: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 875
+C:\GTPS\GTPS-connection.txt:189:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 937: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 875
+C:\GTPS\GTPS-connection.txt:191:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 937: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 875
+C:\GTPS\GTPS-connection.txt:193:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 937: 2404:8000:1122:7c1:b95d:74ab:
+15ad:87df.61838 > 2001:4860:482a:400::.443: UDP, length 875
+C:\GTPS\GTPS-connection.txt:195:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 149: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 87
+C:\GTPS\GTPS-connection.txt:197:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 143: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 81
+C:\GTPS\GTPS-connection.txt:199:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 149: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 87
+C:\GTPS\GTPS-connection.txt:201:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 143: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 81
+C:\GTPS\GTPS-connection.txt:203:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 149: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 87
+C:\GTPS\GTPS-connection.txt:205:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 143: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 81
+C:\GTPS\GTPS-connection.txt:207:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 149: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 87
+C:\GTPS\GTPS-connection.txt:209:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 143: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 81
+C:\GTPS\GTPS-connection.txt:211:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 149: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 87
+C:\GTPS\GTPS-connection.txt:213:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 143: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 81
+C:\GTPS\GTPS-connection.txt:215:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 259: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 197
+C:\GTPS\GTPS-connection.txt:217:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 259: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 197
+C:\GTPS\GTPS-connection.txt:219:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 259: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 197
+C:\GTPS\GTPS-connection.txt:221:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 259: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 197
+C:\GTPS\GTPS-connection.txt:223:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 259: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 197
+C:\GTPS\GTPS-connection.txt:225:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 124: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 62
+C:\GTPS\GTPS-connection.txt:227:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 124: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 62
+C:\GTPS\GTPS-connection.txt:229:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 124: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 62
+C:\GTPS\GTPS-connection.txt:231:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 124: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 62
+C:\GTPS\GTPS-connection.txt:233:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 124: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 62
+C:\GTPS\GTPS-connection.txt:235:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 168: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 106
+C:\GTPS\GTPS-connection.txt:236:[02]0004.0288::2026-11-11 23:35:01.931203000 [Microsoft-Windows-PktMon] PktGroupId 5629
+49953421356, PktNumber 1, Appearance 0, Direction Rx , Type Ethernet , Component 1, Edge 1, Filter 2, OriginalSize 168,
+ LoggedSize 128
+C:\GTPS\GTPS-connection.txt:237:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 168: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 106
+C:\GTPS\GTPS-connection.txt:239:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 168: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 106
+C:\GTPS\GTPS-connection.txt:241:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 168: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 106
+C:\GTPS\GTPS-connection.txt:243:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 168: 2404:8000:12:14::e.443 > 2404
+:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 106
+C:\GTPS\GTPS-connection.txt:245:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1286: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:247:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1286: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:249:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1286: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:251:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1286: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:253:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1286: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1224
+C:\GTPS\GTPS-connection.txt:255:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:257:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:259:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:261:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:263:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:265:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:267:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:269:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:271:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:273:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:275:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:277:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:279:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:281:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:283:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:285:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:287:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:289:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:291:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:293:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:295:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:297:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:299:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:301:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:303:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:305:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:307:        2C-F0-5D-05-6C-C7 > 30-49-9E-4B-0D-0A, IPv6, length 96: 2404:8000:1122:7c1:b95d:74ab:1
+5ad:87df.55645 > 2404:8000:12:14::e.443: UDP, length 34
+C:\GTPS\GTPS-connection.txt:309:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:311:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:313:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:315:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:317:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:319:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
+C:\GTPS\GTPS-connection.txt:321:        30-49-9E-4B-0D-0A > 2C-F0-5D-05-6C-C7, IPv6, length 1292: 2404:8000:12:14::e.443 > 240
+4:8000:1122:7c1:b95d:74ab:15ad:87df.55645: UDP, length 1230
