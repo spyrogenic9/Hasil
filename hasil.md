@@ -1,70 +1,91 @@
-PS C:\GTPS\Gurotopia> $files = @(
->>     ".\include\action\worldlock_storage_modify_amount.cpp",
->>     ".\include\database\peer.hpp",
->>     ".\include\database\database.hpp"
->> )
-PS C:\GTPS\Gurotopia>
-PS C:\GTPS\Gurotopia> foreach ($file in $files) {
->>     Write-Host "`n========== $file ==========" -ForegroundColor Cyan
->>     Get-Content $file
->> }
+PS C:\GTPS\Gurotopia> Get-Content .\include\commands\__command.hpp
+#pragma once
 
-========== .\include\action\worldlock_storage_modify_amount.cpp ==========
+#include <unordered_map>
+
+extern const std::unordered_map<std::string_view, void(*)(ENetEvent&, std::string_view)> cmd_pool;
+PS C:\GTPS\Gurotopia> Get-Content .\include\commands\__command.cpp
 #include "pch.hpp"
 
-#include "onVariant/ConsoleMessage.hpp"
-#include "onVariant/WorldLockStorageResponse.hpp"
-#include "onVariant/EventButtonDataSet.hpp"
-#include "tools/conversions.hpp"
+#include "admin/admin.hpp"
 
-#include "worldlock_storage_getpage.hpp"
-#include "worldlock_storage_modify_amount.hpp"
+#include "onVariant/Action.hpp"
 
-void action::worldlock_storage_modify_amount(ENetEvent& event, const std::string& header)
+#include "msg.hpp"
+#include "sb.hpp"
+#include "time.hpp"
+#include "who.hpp"
+#include "me.hpp"
+#include "find.hpp"
+#include "warp.hpp"
+#include "punch.hpp"
+#include "skin.hpp"
+#include "news.hpp"
+#include "weather.hpp"
+#include "ghost.hpp"
+
+#include "__command.hpp"
+
+/* if you plan to use this outside of this file, please include in __command.hpp (^-^) - and just make it a void. */
+void help_return(ENetEvent& event, const std::string_view text)
 {
-    ::peer *pPeer = static_cast<::peer*>(event.peer->data);
-
-    const ::hPipe hPipe{header};
-
-    u_int amount = atoi(hPipe["amount"].c_str());
-    if (amount <= 0) return;
-    int type = atoi(hPipe["type"].c_str());
-    if (type < -1 || type > 1) return;
-
-    pPeer->wl_storage += type*amount;
-
-    u_short wl = amount,
-            dl = amount / DIAMOND_LOCK_VALUE,
-            bgl = amount / BLUE_GEM_LOCK_VALUE;
-    std::string str;
-
-    if (type == 1)
-    {
-        wl = pPeer->have_slot({ 242, 0 }),
-        dl = pPeer->have_slot({ 1796, 0 }),
-        bgl = pPeer->have_slot({ 7188, 0 });
-        convert_lock(amount, wl, dl, bgl, str);
-    }
-    else convert_lock(amount, wl, dl, bgl, str);
-
-    if (bgl > 0) modify_item_inventory(event, ::slot(7188, -(type)*bgl));
-    if (dl  > 0) modify_item_inventory(event, ::slot(1796, -(type)*dl));
-    if (wl  > 0) modify_item_inventory(event, ::slot(242,  -(type)*wl));
-
-    if (type == -1)
-    {
-        std::string message = std::format("You collected {}.", str);
-
-        send_varlist(event.peer, { "OnTalkBubble", pPeer->netid, message, 0u, 1u });
-        on::ConsoleMessage(event.peer, message);
-    }
-    on::EventButtonDataSet(event, true);
-    on::EventButtonDataSet(event, false);
-    send_varlist(event.peer, { "OnActiveAuctionUpdate", "{\"Active\":false}" });
-    on::WorldLockStorageResponse(event.peer);
+    send_gameMessage(event.peer, {.message = "action|log\nmsg|>> Commands: /admin /msg /sb /time /who /me /find /warp /punch /skin /news /weather /ghost /wave /dance /love /sleep /facepalm /fp /smh /yes /no /omg /idk /shrug /furious /rolleyes /foldarms /stubborn /fold /dab /sassy /dance2 /march /grumpy /shy"});
 }
 
-========== .\include\database\peer.hpp ==========
+const std::unordered_map<std::string_view, void(*)(ENetEvent&, std::string_view)> cmd_pool
+{
+    {"/admin", admin::command},
+    {"/help", help_return},
+    {"/?", help_return},
+    {"/msg", msg},
+    {"/sb", sb},
+    {"/time", command::time}, // @note namespace is to prevent mismatching C time
+    {"/who", who},
+    {"/me", me},
+    {"/find", find},
+    {"/warp", warp},
+    {"/punch", punch},
+    {"/skin", skin},
+    {"/news", news},
+    {"/weather", weather},
+    {"/ghost", ghost},
+    {"/wave", on::Action}, {"/dance", on::Action}, {"/love", on::Action}, {"/sleep", on::Action}, {"/facepalm", on::Action}, {"/fp", on::Action},
+    {"/smh", on::Action}, {"/yes", on::Action}, {"/no", on::Action}, {"/omg", on::Action}, {"/idk", on::Action}, {"/shrug", on::Action},
+    {"/furious", on::Action}, {"/rolleyes", on::Action}, {"/foldarms", on::Action}, {"/fa", on::Action}, {"/stubborn", on::Action}, {"/fold", on::Action},
+    {"/dab", on::Action}, {"/sassy", on::Action}, {"/dance2", on::Action}, {"/march", on::Action}, {"/grumpy", on::Action}, {"/shy", on::Action}
+};
+PS C:\GTPS\Gurotopia>
+PS C:\GTPS\Gurotopia> Get-Content .\include\commands\give.cpp
+Get-Content : Cannot find path 'C:\GTPS\Gurotopia\include\commands\give.cpp' because it does not exist.
+At line:1 char:1
++ Get-Content .\include\commands\give.cpp
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\GTPS\Gurotop...mmands\give.cpp:String) [Get-Content], ItemNotFoundEx
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+
+PS C:\GTPS\Gurotopia> Get-Content .\include\commands\warp.cpp
+#include "pch.hpp"
+
+#include "action/join_request.hpp"
+#include "action/quit_to_exit.hpp"
+
+#include "warp.hpp"
+
+void warp(ENetEvent& event, const std::string_view text)
+{
+    std::string world_name{ text.substr(sizeof("/warp ")-1) };
+    for (char &c : world_name) c = std::toupper(c); // @note start -> START
+
+    send_gameMessage(event.peer, {.message = std::format("action|log\nmsg| `6/warp {}``", world_name)});
+    send_varlist(event.peer, { "OnSetFreezeState", 1 });
+    send_gameMessage(event.peer, {.message = std::format("action|log\nmsg|Magically warping to world `5{}``...", world_name)});
+
+    action::quit_to_exit(event, "", true);
+    action::join_request(event, "", world_name);
+}
+PS C:\GTPS\Gurotopia>
+PS C:\GTPS\Gurotopia> Get-Content .\include\database\peer.hpp
 #pragma once
 
 #include <cmath> // @note std::floor
@@ -344,248 +365,31 @@ extern gamePacket make_gamePacket(const enet_uint8 *data);
 extern ::blob compress_state(const gamePacket &gamePacket);
 
 extern void send_inventory_state(ENetEvent &event);
-
-========== .\include\database\database.hpp ==========
-#pragma once
-
-#include <mysql/mysql.h>
-
-#include "tools/terminal.hpp"
-
-class mysql_gateway
-{
-public:
-    mysql_gateway() { mysql = mysql_init(NULL); }
-    ~mysql_gateway() { mysql_close(mysql); }
-
-    void create_table_if_not_exist();
-    bool column_found(const std::string &table, const std::string &column);
-    int alter_table(const std::string &table, const std::string &column);
-    void integrity();
-
-    void mysql_connect();
-    void load_login();
-
-    MYSQL *mysql{nullptr};
-private:
-    std::string host{"127.0.0.1"};
-    std::string user{"root"};
-    std::string passwd{""};
-};
-extern ::mysql_gateway db;
-
-class hStmt
-{
-public:
-    hStmt(const std::string &query);
-   ~hStmt();
-
-    hStmt           (const hStmt &) = delete;
-    hStmt &operator=(const hStmt &) = delete;
-
-    void bind_param(MYSQL_BIND *param);
-    void execute();
-    void fetch();
-
-    /* https://dev.mysql.com/doc/mysql-errors/8.4/en/client-error-reference.html */
-    void log_stmt_error();
-
-    MYSQL_STMT *pStmt;
-};
-
-#include <cstring> // linux
-
-struct blob
-{
-    /* @note template vibes */
-    void f32(float val) {
-        int size = mData.size();
-        mData.resize(size + sizeof(float));
-        memcpy(mData.data() + size, &val, sizeof(float));
-    }
-    void i32(int val)   {
-        int size = mData.size();
-        mData.resize(size + sizeof(int));
-        memcpy(mData.data() + size, &val, sizeof(int));
-    }
-    void u32(u_int val)   {
-        int size = mData.size();
-        mData.resize(size + sizeof(u_int));
-        memcpy(mData.data() + size, &val, sizeof(u_int));
-    }
-    void i16(short val) {
-        int size = mData.size();
-        mData.resize(size + sizeof(short));
-        memcpy(mData.data() + size, &val, sizeof(short));
-    }
-    void u8(u_char val) {
-        mData.push_back(val);
-    }
-
-    bool read_f32(float &val, int &pos)
-    {
-        if (pos + (int)sizeof(float) > (int)mData.size()) return false;
-        memcpy(&val, mData.data()+pos, sizeof(float));
-        pos += sizeof(float);
-        return true;
-    }
-    bool read_i32(int &val, int &pos)
-    {
-        if (pos + (int)sizeof(int) > (int)mData.size()) return false;
-        memcpy(&val, mData.data()+pos, sizeof(int));
-        pos += sizeof(int);
-        return true;
-    }
-    bool read_u32(u_int &val, int &pos)
-    {
-        if (pos + (int)sizeof(u_int) > (int)mData.size()) return false;
-        memcpy(&val, mData.data()+pos, sizeof(u_int));
-        pos += sizeof(u_int);
-        return true;
-    }
-    bool read_i16(short &val, int &pos)
-    {
-        if (pos + (int)sizeof(short) > (int)mData.size()) return false;
-        memcpy(&val, mData.data()+pos, sizeof(short));
-        pos += sizeof(short);
-        return true;
-    }
-    bool read_u16(u_short &val, int &pos)
-    {
-        if (pos + (int)sizeof(u_short) > (int)mData.size()) return false;
-        memcpy(&val, mData.data()+pos, sizeof(u_short));
-        pos += sizeof(u_short);
-        return true;
-    }
-    bool read_i8(char &val, int &pos)
-    {
-        if (pos + (int)sizeof(char) > (int)mData.size()) return false;
-        memcpy(&val, mData.data()+pos, sizeof(char));
-        pos += sizeof(char);
-        return true;
-    }
-    bool read_u8(u_char &val, int &pos)
-    {
-        if (pos + (int)sizeof(u_char) > (int)mData.size()) return false;
-        memcpy(&val, mData.data()+pos, sizeof(u_char));
-        pos += sizeof(u_char);
-        return true;
-    }
-
-
-    void push_back(const blob &blob)
-    {
-        const auto &data = blob.data();
-
-        mData.insert(mData.end(), data.cbegin(), data.cend());
-    }
-    [[nodiscard]] const std::vector<u_char> &data() const noexcept {
-        return mData;
-    }
-    [[nodiscard]] std::vector<u_char> &data() noexcept {
-        return mData;
-    }
-    [[nodiscard]] constexpr std::size_t size() const noexcept {
-        return mData.size();
-    }
-    constexpr void resize(std::size_t __new_size)
-    {
-        mData.resize(__new_size);
-    }
-
-private:
-    std::vector<u_char> mData;
-};
-
-extern MYSQL_BIND make_bind_in(const signed &buffer);
-extern MYSQL_BIND make_bind_in(const unsigned &buffer);
-extern MYSQL_BIND make_bind_in(const long &buffer);
-extern MYSQL_BIND make_bind_in(const long long &buffer);
-extern MYSQL_BIND make_bind_in(const float &buffer);
-extern MYSQL_BIND make_bind_in(const std::string &buffer);
-extern MYSQL_BIND make_bind_in(const std::vector<u_char> &buffer);
-extern MYSQL_BIND make_bind_in(const ::blob &buffer);
-
-extern MYSQL_BIND make_bind_out(signed &buffer);
-extern MYSQL_BIND make_bind_out(unsigned &buffer);
-extern MYSQL_BIND make_bind_out(long &buffer);
-extern MYSQL_BIND make_bind_out(long long &buffer);
-extern MYSQL_BIND make_bind_out(float &buffer);
-extern MYSQL_BIND make_bind_out(std::string &buffer);
-extern MYSQL_BIND make_bind_out(std::vector<u_char> &buffer);
-extern MYSQL_BIND make_bind_out(::blob &buffer);
-PS C:\GTPS\Gurotopia>
-PS C:\GTPS\Gurotopia> Get-ChildItem .\include -Recurse -File |
->>     Where-Object {
->>         $_.Name -match 'conversion|WorldLockStorageResponse'
->>     } |
->>     ForEach-Object {
->>         Write-Host "`n========== $($_.FullName) ==========" -ForegroundColor Cyan
->>         Get-Content $_.FullName
->>     }
-
-========== C:\GTPS\Gurotopia\include\onVariant\WorldLockStorageResponse.cpp ==========
-#include "pch.hpp"
-
-#include "WorldLockStorageResponse.hpp"
-
-void on::WorldLockStorageResponse(ENetPeer *peer)
-{
-    ::peer *pPeer = static_cast<::peer*>(peer->data);
-
-    const u_int count = pPeer->wl_storage;
-    std::string data{"\x95\x90", 2}; // @note msgpack [[], balance, 0, 0, 0]
-    struct encoding { u_int maximum; u_char prefix; int bytes; };
-    constexpr encoding formats[]{
-        {0x7f, 0, 1}, {0xff, 0xcc, 1}, {0xffff, 0xcd, 2}, {0xffffffffu, 0xce, 4}
-    };
-    const encoding *const format = std::ranges::find_if(formats, [count](const encoding &entry) { return count <= entry.maximum; });
-    if (format->prefix != 0) data.push_back(static_cast<char>(format->prefix));
-    for (int i = format->bytes - 1; i >= 0; --i) data.push_back(static_cast<char>(count >> (i * 8)));
-    data.append(3, '\0');
-
-    send_varlist(peer, { "OnWorldLockStorageResponse", data });
-}
-
-========== C:\GTPS\Gurotopia\include\onVariant\WorldLockStorageResponse.hpp ==========
-#pragma once
-
-namespace on
-{
-    extern void WorldLockStorageResponse(ENetPeer *peer);
-}
-
-========== C:\GTPS\Gurotopia\include\tools\conversions.cpp ==========
-#include "pch.hpp"
-
-#include "conversions.hpp"
-
-void convert_lock(int amount, u_short& wl, u_short& dl, u_short& bgl, std::string &str)
-{
-    bgl = std::min<int>(amount / BLUE_GEM_LOCK_VALUE, bgl);
-    amount -= bgl * BLUE_GEM_LOCK_VALUE;
-
-    dl = std::min<int>(amount / DIAMOND_LOCK_VALUE, dl);
-    amount -= dl * DIAMOND_LOCK_VALUE;
-
-    wl = std::min<int>(amount, wl);
-    amount -= wl;
-
-    if (bgl > 0)
-        str = std::format("{} `2Blue Gem Lock`` and {} `2Diamond Lock`` and {} `2World Lock``", bgl, dl, wl);
-    else if (dl > 0)
-        str = std::format("{} `2Diamond Lock`` and {} `2World Lock``", dl, wl);
-    else if (wl > 0)
-        str = std::format("{} `2World Lock``", wl);
-}
-
-========== C:\GTPS\Gurotopia\include\tools\conversions.hpp ==========
-#pragma once
-
-enum : u_short/*fit in ::slot::count*/
-{
-    DIAMOND_LOCK_VALUE = 100,
-    BLUE_GEM_LOCK_VALUE = 1000
-};
-
-void convert_lock(int amount, u_short& wl, u_short& dl, u_short& bgl, std::string &str);
+PS C:\GTPS\Gurotopia> Get-ChildItem .\include\commands -File |
+>>     Select-Object -ExpandProperty Name
+find.cpp
+find.hpp
+ghost.cpp
+ghost.hpp
+me.cpp
+me.hpp
+msg.cpp
+msg.hpp
+news.cpp
+news.hpp
+punch.cpp
+punch.hpp
+sb.cpp
+sb.hpp
+skin.cpp
+skin.hpp
+time.cpp
+time.hpp
+warp.cpp
+warp.hpp
+weather.cpp
+weather.hpp
+who.cpp
+who.hpp
+__command.cpp
+__command.hpp
